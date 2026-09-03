@@ -1,0 +1,59 @@
+@host = http://localhost:3000/api
+
+### Каталог
+GET {{host}}/products
+
+### Фильтр
+GET {{host}}/products?category=jeans&size=L
+
+### Товар не найден
+GET {{host}}/products/999
+
+### Добавить в корзину
+POST {{host}}/cart/items
+Content-Type: application/json
+
+{ "productId": 2, "size": "L", "quantity": 2 }
+
+### Недоступный размер
+POST {{host}}/cart/items
+Content-Type: application/json
+
+{ "productId": 2, "size": "XXL", "quantity": 1 }
+
+### Корзина
+GET {{host}}/cart
+
+### Изменить количество
+PUT {{host}}/cart/items/1
+Content-Type: application/json
+
+{ "quantity": 3 }
+
+### Оформить заказ
+POST {{host}}/orders
+Content-Type: application/json
+
+{
+  "customer": {
+    "name": "Иван Петров",
+    "email": "ivan@example.com",
+    "phone": "+375291234567",
+    "address": "г. Минск, ул. Независимости, 25, кв. 14"
+  }
+}
+
+### Список заказов
+GET {{host}}/orders?status=new
+
+### Смена статуса
+PATCH {{host}}/orders/1/status
+Content-Type: application/json
+
+{ "status": "paid" }
+
+### Удаление
+DELETE {{host}}/orders/1
+
+### Повторное удаление — 404
+DELETE {{host}}/orders/1
