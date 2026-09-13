@@ -1,12 +1,13 @@
 const { Router } = require('express');
 const controller = require('../controllers/products.controller');
+const asyncHandler = require('../utils/asyncHandler');
 
 const router = Router();
 
-router.get('/', controller.list);
-router.get('/:id', controller.getOne);
-router.post('/', controller.create);
-router.put('/:id', controller.replace);
-router.delete('/:id', controller.remove);
+router.get('/', asyncHandler(controller.list));
+router.get('/:id', asyncHandler(controller.getOne));
+router.post('/', asyncHandler(controller.create));
+router.put('/:id', asyncHandler(controller.replace));
+router.delete('/:id', asyncHandler(controller.remove));
 
 module.exports = router;

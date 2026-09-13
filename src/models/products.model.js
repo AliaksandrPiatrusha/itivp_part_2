@@ -1,42 +1,39 @@
-const products = [
-  { id: 1, title: 'Футболка Oversize', category: 'tshirts', sizes: ['S', 'M', 'L'], color: 'чёрный', price: 39.9, stock: 25 },
-  { id: 2, title: 'Джинсы Slim Fit', category: 'jeans', sizes: ['M', 'L', 'XL'], color: 'синий', price: 89.0, stock: 14 },
-  { id: 3, title: 'Худи Basic', category: 'hoodies', sizes: ['S', 'M', 'L', 'XL'], color: 'серый', price: 74.5, stock: 8 }
-];
+const { Op } = require('sequelize');
+const { Product } = require('../db/models');
 
-let nextId = 4;
+const findAll = async ({ category, size, maxPrice } = {}) => {
+  const where = {};
+  if (category) where.category = category;
+  if (maxPrice !== undefined) {
+    const max = Number(maxPrice);
+    if (Number.isFinite(max)) where.price = { [Op.lte]: max };
+  }
 
-const findAll = ({ category, size, maxPrice } = {}) =>
-  products.filter(p =>
-    (!category || p.category === category) &&
-    (!size || p.sizes.includes(size)) &&
-    (!maxPrice || p.price <= Number(maxPrice))
-  );
+  const products = await Product.findAll({ where, order: [['id', 'ASC']] });
+  return size ? products.filter(p => p.sizes.includes(size)) : products;
+};
 
-const findById = id => products.find(p => p.id === id) || null;
+const findById = id => Product.findByPk(id);
 
-const create = data => {
-  const product = { id: nextId++, ...data };
-  products.push(product);
+const findByIdForUpdate = (id, transaction) =>
+  Product.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+
+const create = data => Product.create(data);
+
+const replace = async (id, data) => {
+  const product = await Product.findByPk(id);
+  if (!product) return null;
+  return product.update(data);
+};
+
+const remove = async id => {
+  const product = await Product.findByPk(id);
+  if (!product) return null;
+  await product.destroy();
   return product;
 };
 
-const replace = (id, data) => {
-  const index = products.findIndex(p => p.id === id);
-  if (index === -1) return null;
-  products[index] = { id, ...data };
-  return products[index];
-};
+const decreaseStock = (id, quantity, transaction) =>
+  Product.decrement('stock', { by: quantity, where: { id }, transaction });
 
-const remove = id => {
-  const index = products.findIndex(p => p.id === id);
-  if (index === -1) return null;
-  return products.splice(index, 1)[0];
-};
-
-const decreaseStock = (id, quantity) => {
-  const product = findById(id);
-  if (product) product.stock -= quantity;
-};
-
-module.exports = { findAll, findById, create, replace, remove, decreaseStock };
+module.exports = { findAll, findById, findByIdForUpdate, create, replace, remove, decreaseStock };

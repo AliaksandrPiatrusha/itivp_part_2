@@ -1,36 +1,86 @@
 @host = http://localhost:3000/api
 
-### Каталог
+# 
 GET {{host}}/products
 
-### Фильтр
+###
 GET {{host}}/products?category=jeans&size=L
 
-### Товар не найден
+### 
 GET {{host}}/products/999
 
-### Добавить в корзину
+### 
+GET {{host}}/products/abc
+
+### 
+POST {{host}}/products
+Content-Type: application/json
+
+{
+  "title": "Куртка бомбер",
+  "category": "jackets",
+  "sizes": ["S", "M", "L"],
+  "color": "хаки",
+  "price": 129.9,
+  "stock": 10
+}
+
+###
+POST {{host}}/products
+Content-Type: application/json
+
+{ "title": "Куртка бомбер" }
+
+### 
+PUT {{host}}/products/4
+Content-Type: application/json
+
+{
+  "title": "Куртка бомбер зимняя",
+  "category": "jackets",
+  "sizes": ["M", "L"],
+  "color": "чёрный",
+  "price": 179.9,
+  "stock": 6
+}
+
+### 
+DELETE {{host}}/products/4
+
+### 
+DELETE {{host}}/products/4
+
+### 
+GET {{host}}/cart
+
+### 
 POST {{host}}/cart/items
 Content-Type: application/json
 
 { "productId": 2, "size": "L", "quantity": 2 }
 
-### Недоступный размер
+### 
 POST {{host}}/cart/items
 Content-Type: application/json
 
 { "productId": 2, "size": "XXL", "quantity": 1 }
 
-### Корзина
-GET {{host}}/cart
+### 
+POST {{host}}/cart/items
+Content-Type: application/json
 
-### Изменить количество
+{ "productId": 2, "size": "M", "quantity": 99 }
+
+### 
 PUT {{host}}/cart/items/1
 Content-Type: application/json
 
 { "quantity": 3 }
 
-### Оформить заказ
+### 
+DELETE {{host}}/cart/items/1
+
+### 
 POST {{host}}/orders
 Content-Type: application/json
 
@@ -43,17 +93,71 @@ Content-Type: application/json
   }
 }
 
-### Список заказов
+### 
+POST {{host}}/cart/items
+Content-Type: application/json
+
+{ "productId": 1, "size": "M", "quantity": 1 }
+
+### 
+POST {{host}}/orders
+Content-Type: application/json
+
+{
+  "customer": {
+    "name": "Иван Петров",
+    "email": "ivan@example.com",
+    "phone": "+375291234567",
+    "address": "г. Минск, ул. Независимости, 25, кв. 14"
+  }
+}
+
+### 
 GET {{host}}/orders?status=new
 
-### Смена статуса
+### 
 PATCH {{host}}/orders/1/status
 Content-Type: application/json
 
 { "status": "paid" }
 
-### Удаление
+### 
+PATCH {{host}}/orders/1/status
+Content-Type: application/json
+
+{ "status": "wrong" }
+
+### 
+PUT {{host}}/orders/1
+Content-Type: application/json
+
+{
+  "customer": {
+    "name": "Иван Петров",
+    "email": "ivan@example.com",
+    "phone": "+375291234567",
+    "address": "г. Минск, ул. Независимости, 25, кв. 14"
+  },
+  "items": [
+    { "id": 2, "productId": 1, "title": "Футболка Oversize", "size": "M", "price": 39.9, "quantity": 2 }
+  ],
+  "status": "shipped"
+}
+
+### 
 DELETE {{host}}/orders/1
 
-### Повторное удаление — 404
-DELETE {{host}}/orders/1
+### 
+GET {{host}}/unknown
+
+### 
+DELETE {{host}}/cart
+
+### 
+GET {{host}}/products/1
+
+### 
+GET {{host}}/orders/1
+
+###
+GET http://localhost:3000/
