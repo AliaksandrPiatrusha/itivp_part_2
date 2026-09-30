@@ -3,7 +3,7 @@
 const db = require('../src/db/models');
 
 async function main() {
-  const tables = [db.Product, db.CartItem, db.Order, db.OrderItem];
+  const tables = [db.User, db.Product, db.CartItem, db.Order, db.OrderItem];
 
   for (const model of tables) {
     const rows = await model.findAll({ raw: true });

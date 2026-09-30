@@ -1,0 +1,25 @@
+'use strict';
+require('dotenv').config();
+const bcrypt = require('bcrypt');
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@shop.local';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin123!';
+
+/** @type {import('sequelize-cli').Seed} */
+module.exports = {
+  async up(queryInterface) {
+    const now = new Date();
+    await queryInterface.bulkInsert('Users', [
+      {
+        email: ADMIN_EMAIL,
+        passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 10),
+        role: 'admin',
+        createdAt: now,
+        updatedAt: now
+      }
+    ]);
+  },
+  async down(queryInterface) {
+    await queryInterface.bulkDelete('Users', { email: ADMIN_EMAIL }, {});
+  }
+};

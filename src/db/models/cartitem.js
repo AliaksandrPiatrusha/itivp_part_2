@@ -5,9 +5,11 @@ module.exports = (sequelize, DataTypes) => {
   class CartItem extends Model {
     static associate(models) {
       CartItem.belongsTo(models.Product, { foreignKey: 'productId', as: 'product' });
+      CartItem.belongsTo(models.User, { foreignKey: 'userId', as: 'user' });
     }
   }
   CartItem.init({
+    userId: { type: DataTypes.INTEGER, allowNull: false },
     productId: { type: DataTypes.INTEGER, allowNull: false },
     title: { type: DataTypes.STRING, allowNull: false },
     size: { type: DataTypes.STRING, allowNull: false },
@@ -16,7 +18,7 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'CartItem',
-    indexes: [{ unique: true, fields: ['productId', 'size'] }]
+    indexes: [{ unique: true, fields: ['userId', 'productId', 'size'] }]
   });
   return CartItem;
 };

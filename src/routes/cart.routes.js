@@ -1,8 +1,11 @@
 const { Router } = require('express');
 const controller = require('../controllers/cart.controller');
 const asyncHandler = require('../utils/asyncHandler');
+const auth = require('../middleware/auth');
 
 const router = Router();
+
+router.use(auth);
 
 router.get('/', asyncHandler(controller.view));
 router.post('/items', asyncHandler(controller.addItem));

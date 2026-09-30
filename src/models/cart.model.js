@@ -10,54 +10,55 @@ const toDTO = item => ({
   quantity: item.quantity
 });
 
-const getItems = async () => {
+const getItems = async userId => {
   const items = await CartItem.findAll({
+    where: { userId },
     include: [{ model: Product, as: 'product' }],
     order: [['id', 'ASC']]
   });
   return items.map(toDTO);
 };
 
-const findItem = id => CartItem.findByPk(id);
+const findItem = (userId, id) => CartItem.findOne({ where: { id, userId } });
 
-const findSame = (productId, size) => CartItem.findOne({ where: { productId, size } });
+const findSame = (userId, productId, size) => CartItem.findOne({ where: { userId, productId, size } });
 
-const addItem = async ({ productId, title, size, price, quantity }) => {
+const addItem = async ({ userId, productId, title, size, price, quantity }) => {
   try {
     return await sequelize.transaction(async transaction => {
       const existing = await CartItem.findOne({
-        where: { productId, size },
+        where: { userId, productId, size },
         transaction,
         lock: transaction.LOCK.UPDATE
       });
       if (existing) {
         return existing.increment('quantity', { by: quantity, transaction });
       }
-      return CartItem.create({ productId, title, size, price, quantity }, { transaction });
+      return CartItem.create({ userId, productId, title, size, price, quantity }, { transaction });
     });
   } catch (err) {
     if (err instanceof UniqueConstraintError) {
-      const existing = await findSame(productId, size);
+      const existing = await findSame(userId, productId, size);
       return existing.increment('quantity', { by: quantity });
     }
     throw err;
   }
 };
 
-const updateItem = async (id, quantity) => {
-  const item = await findItem(id);
+const updateItem = async (userId, id, quantity) => {
+  const item = await findItem(userId, id);
   if (!item) return null;
   return item.update({ quantity });
 };
 
-const removeItem = async id => {
-  const item = await findItem(id);
+const removeItem = async (userId, id) => {
+  const item = await findItem(userId, id);
   if (!item) return null;
   await item.destroy();
   return item;
 };
 
-const clear = transaction => CartItem.destroy({ where: {}, transaction });
+const clear = (userId, transaction) => CartItem.destroy({ where: { userId }, transaction });
 
 const total = items =>
   Number(items.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0).toFixed(2));

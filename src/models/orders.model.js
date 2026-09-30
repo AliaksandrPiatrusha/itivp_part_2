@@ -16,6 +16,7 @@ const toDTO = order => {
   const plain = order.get({ plain: true });
   return {
     id: plain.id,
+    userId: plain.userId,
     customer: {
       name: plain.customerName,
       email: plain.customerEmail,
@@ -37,10 +38,11 @@ const toDTO = order => {
   };
 };
 
-const findAll = async ({ status, customer } = {}) => {
+const findAll = async ({ status, customer, userId } = {}) => {
   if (status && !STATUSES.includes(status)) return [];
 
   const where = {};
+  if (userId !== undefined) where.userId = userId;
   if (status) where.status = status;
   if (customer) where.customerName = { [Op.iLike]: `%${escapeLike(customer)}%` };
 
@@ -53,7 +55,7 @@ const findById = async id => {
   return toDTO(order);
 };
 
-const checkout = ({ customer, items }) =>
+const checkout = ({ userId, customer, items }) =>
   sequelize.transaction(async transaction => {
     for (const item of items) {
       const product = await Product.findByPk(item.productId, {
@@ -66,6 +68,7 @@ const checkout = ({ customer, items }) =>
     }
 
     const order = await Order.create({
+      userId,
       customerName: customer.name,
       customerEmail: customer.email,
       customerPhone: customer.phone,
@@ -89,7 +92,7 @@ const checkout = ({ customer, items }) =>
     await Promise.all(items.map(i =>
       Product.decrement('stock', { by: i.quantity, where: { id: i.productId }, transaction })
     ));
-    await CartItem.destroy({ where: {}, transaction });
+    await CartItem.destroy({ where: { userId }, transaction });
 
     await order.reload({ include: itemsInclude, transaction });
     return toDTO(order);

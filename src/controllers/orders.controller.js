@@ -3,25 +3,34 @@ const cart = require('../models/cart.model');
 const ApiError = require('../utils/ApiError');
 const { parseId, requireFields } = require('../utils/validators');
 
+const isAdmin = req => req.user.role === 'admin';
+
+// Администратор видит все заказы, покупатель — только свои.
 const list = async (req, res) => {
-  res.json({ data: await orders.findAll(req.query) });
+  const { status, customer } = req.query;
+  const filter = isAdmin(req) ? { status, customer } : { status, customer, userId: req.user.id };
+  res.json({ data: await orders.findAll(filter) });
 };
 
 const getOne = async (req, res) => {
   const id = parseId(req.params.id);
   const order = await orders.findById(id);
-  if (!order) throw ApiError.notFound(`Заказ с id=${id} не найден`);
+  // Чужой заказ отдаём как 404, чтобы не раскрывать факт его существования.
+  if (!order || (!isAdmin(req) && order.userId !== req.user.id)) {
+    throw ApiError.notFound(`Заказ с id=${id} не найден`);
+  }
   res.json({ data: order });
 };
 
 const checkout = async (req, res) => {
   requireFields(req.body, ['customer']);
-  requireFields(req.body.customer, ['name', 'email', 'address']);
+  const customer = { email: req.user.email, ...req.body.customer };
+  requireFields(customer, ['name', 'email', 'address']);
 
-  const items = await cart.getItems();
+  const items = await cart.getItems(req.user.id);
   if (items.length === 0) throw ApiError.badRequest('Корзина пуста, заказ не может быть создан');
 
-  const order = await orders.checkout({ customer: req.body.customer, items });
+  const order = await orders.checkout({ userId: req.user.id, customer, items });
 
   res.status(201).location(`/api/orders/${order.id}`).json({ data: order });
 };

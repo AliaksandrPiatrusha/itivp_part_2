@@ -1,5 +1,10 @@
 require('dotenv').config();
 
+if (!process.env.JWT_SECRET) {
+  console.error('Не задана переменная окружения JWT_SECRET (см. .env.example)');
+  process.exit(1);
+}
+
 const app = require('./src/app');
 const { sequelize } = require('./src/db/models');
 
