@@ -1,20 +1,93 @@
 @host = http://localhost:3000/api
 
-# 
+# ===== Аутентификация =====
+
+### Регистрация (поле role игнорируется — новые пользователи всегда получают роль user)
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{ "email": "ivan@example.com", "password": "secret12", "role": "admin" }
+
+### Повторная регистрация того же email -> 409
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{ "email": "ivan@example.com", "password": "secret12" }
+
+### Слишком короткий пароль -> 400
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{ "email": "petr@example.com", "password": "123" }
+
+### Неверный пароль -> 401
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "ivan@example.com", "password": "wrong" }
+
+### Вход покупателя
+# @name userLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "ivan@example.com", "password": "secret12" }
+
+### Вход администратора (создаётся сидом)
+# @name adminLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@shop.local", "password": "Admin123!" }
+
+###
+@userToken = {{userLogin.response.body.data.token}}
+@adminToken = {{adminLogin.response.body.data.token}}
+
+### Профиль с валидным токеном -> 200
+GET {{host}}/profile
+Authorization: Bearer {{userToken}}
+
+### Профиль без токена -> 401
+GET {{host}}/profile
+
+### Профиль с испорченным токеном -> 401
+GET {{host}}/profile
+Authorization: Bearer invalid.token.value
+
+# ===== Товары (чтение — всем, изменение — только admin) =====
+
+###
 GET {{host}}/products
 
 ###
 GET {{host}}/products?category=jeans&size=L
 
-### 
+###
 GET {{host}}/products/999
 
-### 
+###
 GET {{host}}/products/abc
 
-### 
+### Покупатель не может добавлять товары -> 403
 POST {{host}}/products
 Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "title": "Куртка бомбер",
+  "category": "jackets",
+  "sizes": ["S", "M", "L"],
+  "color": "хаки",
+  "price": 129.9,
+  "stock": 10
+}
+
+### Администратор добавляет товар -> 201
+# @name createdProduct
+POST {{host}}/products
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
 
 {
   "title": "Куртка бомбер",
@@ -26,14 +99,19 @@ Content-Type: application/json
 }
 
 ###
+@productId = {{createdProduct.response.body.data.id}}
+
+###
 POST {{host}}/products
 Content-Type: application/json
+Authorization: Bearer {{adminToken}}
 
 { "title": "Куртка бомбер" }
 
-### 
-PUT {{host}}/products/4
+###
+PUT {{host}}/products/{{productId}}
 Content-Type: application/json
+Authorization: Bearer {{adminToken}}
 
 {
   "title": "Куртка бомбер зимняя",
@@ -44,120 +122,122 @@ Content-Type: application/json
   "stock": 6
 }
 
-### 
-DELETE {{host}}/products/4
+# ===== Корзина (у каждого пользователя своя) =====
 
-### 
-DELETE {{host}}/products/4
-
-### 
+### Без токена -> 401
 GET {{host}}/cart
 
-### 
+###
+GET {{host}}/cart
+Authorization: Bearer {{userToken}}
+
+###
 POST {{host}}/cart/items
 Content-Type: application/json
+Authorization: Bearer {{userToken}}
 
-{ "productId": 2, "size": "L", "quantity": 2 }
+{ "productId": {{productId}}, "size": "L", "quantity": 2 }
 
-### 
+###
 POST {{host}}/cart/items
 Content-Type: application/json
+Authorization: Bearer {{userToken}}
 
-{ "productId": 2, "size": "XXL", "quantity": 1 }
+{ "productId": {{productId}}, "size": "XXL", "quantity": 1 }
 
-### 
+###
 POST {{host}}/cart/items
 Content-Type: application/json
+Authorization: Bearer {{userToken}}
 
-{ "productId": 2, "size": "M", "quantity": 99 }
+{ "productId": {{productId}}, "size": "M", "quantity": 99 }
 
-### 
+###
 PUT {{host}}/cart/items/1
 Content-Type: application/json
+Authorization: Bearer {{userToken}}
 
 { "quantity": 3 }
 
-### 
+###
 DELETE {{host}}/cart/items/1
+Authorization: Bearer {{userToken}}
 
-### 
+# ===== Заказы =====
+
+### Оформление заказа (email по умолчанию берётся из токена)
+# @name createdOrder
 POST {{host}}/orders
 Content-Type: application/json
+Authorization: Bearer {{userToken}}
 
 {
   "customer": {
     "name": "Иван Петров",
-    "email": "ivan@example.com",
     "phone": "+375291234567",
     "address": "г. Минск, ул. Независимости, 25, кв. 14"
   }
 }
 
-### 
-POST {{host}}/cart/items
-Content-Type: application/json
+###
+@orderId = {{createdOrder.response.body.data.id}}
 
-{ "productId": 1, "size": "M", "quantity": 1 }
+### Покупатель видит только свои заказы
+GET {{host}}/orders
+Authorization: Bearer {{userToken}}
 
-### 
-POST {{host}}/orders
-Content-Type: application/json
-
-{
-  "customer": {
-    "name": "Иван Петров",
-    "email": "ivan@example.com",
-    "phone": "+375291234567",
-    "address": "г. Минск, ул. Независимости, 25, кв. 14"
-  }
-}
-
-### 
+### Администратор видит все заказы
 GET {{host}}/orders?status=new
+Authorization: Bearer {{adminToken}}
 
-### 
-PATCH {{host}}/orders/1/status
+### Покупатель не может менять статус -> 403
+PATCH {{host}}/orders/{{orderId}}/status
 Content-Type: application/json
+Authorization: Bearer {{userToken}}
 
 { "status": "paid" }
 
-### 
-PATCH {{host}}/orders/1/status
+###
+PATCH {{host}}/orders/{{orderId}}/status
 Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "status": "paid" }
+
+###
+PATCH {{host}}/orders/{{orderId}}/status
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
 
 { "status": "wrong" }
 
-### 
-PUT {{host}}/orders/1
+###
+DELETE {{host}}/orders/{{orderId}}
+Authorization: Bearer {{adminToken}}
+
+# ===== Пользователи (только admin) =====
+
+### Покупатель -> 403
+GET {{host}}/users
+Authorization: Bearer {{userToken}}
+
+###
+GET {{host}}/users
+Authorization: Bearer {{adminToken}}
+
+### Назначить роль (подставьте id пользователя)
+PATCH {{host}}/users/2/role
 Content-Type: application/json
+Authorization: Bearer {{adminToken}}
 
-{
-  "customer": {
-    "name": "Иван Петров",
-    "email": "ivan@example.com",
-    "phone": "+375291234567",
-    "address": "г. Минск, ул. Независимости, 25, кв. 14"
-  },
-  "items": [
-    { "id": 2, "productId": 1, "title": "Футболка Oversize", "size": "M", "price": 39.9, "quantity": 2 }
-  ],
-  "status": "shipped"
-}
+{ "role": "admin" }
 
-### 
-DELETE {{host}}/orders/1
+###
+DELETE {{host}}/products/{{productId}}
+Authorization: Bearer {{adminToken}}
 
-### 
+###
 GET {{host}}/unknown
-
-### 
-DELETE {{host}}/cart
-
-### 
-GET {{host}}/products/1
-
-### 
-GET {{host}}/orders/1
 
 ###
 GET http://localhost:3000/
