@@ -37,3 +37,5 @@ const decreaseStock = (id, quantity, transaction) =>
   Product.decrement('stock', { by: quantity, where: { id }, transaction });
 
 module.exports = { findAll, findById, findByIdForUpdate, create, replace, remove, decreaseStock };
+
+

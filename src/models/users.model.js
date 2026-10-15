@@ -17,7 +17,6 @@ const findAll = async () => {
 
 const findById = async id => toDTO(await User.findByPk(id));
 
-// Возвращает Sequelize-экземпляр вместе с passwordHash — только для проверки пароля.
 const findByEmailWithHash = email => User.findOne({ where: { email } });
 
 const create = async ({ email, passwordHash }) =>

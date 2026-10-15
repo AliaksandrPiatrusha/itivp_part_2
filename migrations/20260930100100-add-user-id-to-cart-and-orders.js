@@ -3,7 +3,6 @@
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.sequelize.transaction(async transaction => {
-      // Корзина становится персональной: старые "общие" позиции не принадлежат никому.
       await queryInterface.bulkDelete('CartItems', {}, { transaction });
       await queryInterface.removeIndex('CartItems', 'cart_items_product_id_size_unique', { transaction });
       await queryInterface.addColumn('CartItems', 'userId', {
@@ -19,7 +18,6 @@ module.exports = {
         transaction
       });
 
-      // Заказы, созданные до появления пользователей, остаются без владельца.
       await queryInterface.addColumn('Orders', 'userId', {
         type: Sequelize.INTEGER,
         allowNull: true,

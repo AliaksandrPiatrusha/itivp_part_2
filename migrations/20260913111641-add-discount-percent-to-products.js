@@ -12,3 +12,6 @@ module.exports = {
     await queryInterface.removeColumn('Products', 'discountPercent');
   }
 };
+
+
+

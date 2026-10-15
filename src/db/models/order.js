@@ -7,11 +7,9 @@ module.exports = (sequelize, DataTypes) => {
   class Order extends Model {
     static associate(models) {
       Order.hasMany(models.OrderItem, { foreignKey: 'orderId', as: 'items', onDelete: 'CASCADE' });
-      Order.belongsTo(models.User, { foreignKey: 'userId', as: 'user' });
     }
   }
   Order.init({
-    userId: { type: DataTypes.INTEGER },
     customerName: { type: DataTypes.STRING, allowNull: false },
     customerEmail: { type: DataTypes.STRING, allowNull: false },
     customerPhone: { type: DataTypes.STRING },
@@ -25,3 +23,8 @@ module.exports = (sequelize, DataTypes) => {
   Order.STATUSES = STATUSES;
   return Order;
 };
+
+
+
+
+
