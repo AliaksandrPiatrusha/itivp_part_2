@@ -1,23 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchProducts, getErrorMessage, isCanceled } from '../api';
 import { CATEGORIES, categoryLabel, formatPrice } from '../data/catalog';
 import useDebounce from '../hooks/useDebounce';
 import validateItem, { quantityLimit } from '../utils/validateItem';
 
 const SEARCH_DEBOUNCE_MS = 400;
+// Сколько товаров каталога загружается за один запрос.
+const PAGE_SIZE = 6;
 
 const defaultSize = sizes => (sizes.includes('M') ? 'M' : sizes[0] ?? '');
 
 /**
  * Добавление товара в корзину: поиск по каталогу на сервере (GET /api/products?search=)
- * с debounce ввода и отменой устаревших запросов, затем выбор размера и количества.
+ * с debounce ввода и отменой устаревших запросов, постраничная загрузка (limit/offset)
+ * с кнопкой «Показать ещё», затем выбор размера и количества.
  */
 export default function CartForm({ onAdd }) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [reloadKey, setReloadKey] = useState(0);
-  // Результат последнего завершённого запроса и «ключ» параметров, для которых он получен.
-  const [result, setResult] = useState({ key: null, products: [], error: null });
+  // Загруженные страницы каталога и «ключ» параметров поиска, для которых они получены.
+  const [result, setResult] = useState({ key: null, products: [], total: 0, error: null });
+  // Состояние догрузки следующей страницы (тоже привязано к ключу параметров).
+  const [more, setMore] = useState({ key: null, loading: false, error: null });
+  const moreControllerRef = useRef(null);
 
   const [selected, setSelected] = useState(null);
   const [size, setSize] = useState('');
@@ -28,22 +34,54 @@ export default function CartForm({ onAdd }) {
   const debouncedSearch = useDebounce(search.trim(), SEARCH_DEBOUNCE_MS);
   const requestKey = `${debouncedSearch}|${category}|${reloadKey}`;
 
+  // Первая страница: загружается заново при каждом изменении параметров поиска.
   useEffect(() => {
     const controller = new AbortController();
-    fetchProducts({ search: debouncedSearch, category }, controller.signal)
-      .then(products => setResult({ key: requestKey, products, error: null }))
+    fetchProducts({ search: debouncedSearch, category, limit: PAGE_SIZE, offset: 0 }, controller.signal)
+      .then(({ items, total }) => setResult({ key: requestKey, products: items, total, error: null }))
       .catch(err => {
-        if (!isCanceled(err)) setResult({ key: requestKey, products: [], error: getErrorMessage(err) });
+        if (!isCanceled(err)) setResult({ key: requestKey, products: [], total: 0, error: getErrorMessage(err) });
       });
-    // Параметры поиска изменились или компонент размонтирован — прерываем устаревший запрос,
-    // чтобы его ответ не перезаписал более свежий результат.
-    return () => controller.abort();
+    // Параметры поиска изменились или компонент размонтирован — прерываем устаревшие запросы
+    // (и первой страницы, и догрузки), чтобы их ответы не перезаписали более свежий результат.
+    return () => {
+      controller.abort();
+      moreControllerRef.current?.abort();
+    };
   }, [debouncedSearch, category, reloadKey, requestKey]);
 
   // Загрузка и ожидание debounce вычисляются из состояния, а не хранятся отдельно.
   const isLoading = result.key !== requestKey;
   const isTyping = search.trim() !== debouncedSearch;
-  const { products, error: loadError } = result;
+  const { products, total, error: loadError } = result;
+  const isLoadingMore = more.key === requestKey && more.loading;
+  const moreError = more.key === requestKey ? more.error : null;
+  const hasMore = !isLoading && products.length < total;
+
+  // «Показать ещё»: следующая страница начинается с offset = числу уже загруженных товаров.
+  const loadMore = () => {
+    const key = requestKey;
+    const controller = new AbortController();
+    moreControllerRef.current = controller;
+    setMore({ key, loading: true, error: null });
+
+    fetchProducts(
+      { search: debouncedSearch, category, limit: PAGE_SIZE, offset: products.length },
+      controller.signal
+    )
+      .then(({ items, total: newTotal }) => {
+        setResult(prev => {
+          if (prev.key !== key) return prev;
+          // Защита от дублей, если каталог изменился между запросами.
+          const known = new Set(prev.products.map(p => p.id));
+          return { ...prev, products: [...prev.products, ...items.filter(p => !known.has(p.id))], total: newTotal };
+        });
+        setMore({ key, loading: false, error: null });
+      })
+      .catch(err => {
+        if (!isCanceled(err)) setMore({ key, loading: false, error: getErrorMessage(err) });
+      });
+  };
 
   const selectProduct = product => {
     setSelected(product);
@@ -75,7 +113,7 @@ export default function CartForm({ onAdd }) {
       <div className="list-header">
         <h2>Добавить товар</h2>
         <span className="save-status" aria-live="polite">
-          {isTyping ? 'Ввод…' : isLoading ? 'Поиск на сервере…' : loadError ? '' : `Найдено: ${products.length}`}
+          {isTyping ? 'Ввод…' : isLoading ? 'Поиск на сервере…' : loadError ? '' : `Показано ${products.length} из ${total}`}
         </span>
       </div>
 
@@ -127,6 +165,20 @@ export default function CartForm({ onAdd }) {
             <li className="placeholder"><span className="spinner" aria-hidden="true" />Загрузка каталога…</li>
           )}
         </ul>
+      )}
+
+      {(hasMore || moreError) && !loadError && (
+        <div className="load-more">
+          {moreError && <span className="error">{moreError}</span>}
+          <button type="button" className="btn" onClick={loadMore} disabled={isLoadingMore}>
+            {isLoadingMore && <span className="spinner spinner-sm" aria-hidden="true" />}
+            {isLoadingMore
+              ? 'Загрузка…'
+              : moreError
+                ? 'Повторить'
+                : `Показать ещё (осталось ${total - products.length})`}
+          </button>
+        </div>
       )}
 
       <form className="add-form" onSubmit={handleSubmit} noValidate>

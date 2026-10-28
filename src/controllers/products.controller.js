@@ -25,8 +25,40 @@ const validateBody = body => {
   };
 };
 
+const MAX_LIMIT = 100;
+
+// Параметры пагинации ?limit=&offset= (лаб. №25). Без limit возвращается весь список.
+const parsePagination = ({ limit, offset }) => {
+  const page = { offset: 0 };
+  if (limit !== undefined) {
+    const value = Number(limit);
+    if (!Number.isInteger(value) || value < 1 || value > MAX_LIMIT) {
+      throw ApiError.badRequest(`Параметр limit должен быть целым числом от 1 до ${MAX_LIMIT}`);
+    }
+    page.limit = value;
+  }
+  if (offset !== undefined) {
+    const value = Number(offset);
+    if (!Number.isInteger(value) || value < 0) {
+      throw ApiError.badRequest('Параметр offset должен быть целым неотрицательным числом');
+    }
+    page.offset = value;
+  }
+  return page;
+};
+
 const list = async (req, res) => {
-  res.json({ data: await products.findAll(req.query) });
+  const page = parsePagination(req.query);
+  const { rows, total } = await products.findAll(req.query, page);
+  res.json({
+    data: rows,
+    meta: {
+      total,
+      limit: page.limit ?? null,
+      offset: page.offset,
+      hasMore: page.offset + rows.length < total
+    }
+  });
 };
 
 const getOne = async (req, res) => {

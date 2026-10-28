@@ -66,6 +66,12 @@ GET {{host}}/products?category=jeans&size=L
 ### Поиск по названию/цвету без учёта регистра (лаб. №25)
 GET {{host}}/products?search=джин
 
+### Пагинация: вторая страница по 6 товаров (meta.total, meta.hasMore)
+GET {{host}}/products?limit=6&offset=6
+
+### Некорректный limit -> 400
+GET {{host}}/products?limit=0
+
 ###
 GET {{host}}/products/999
 

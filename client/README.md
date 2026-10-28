@@ -57,6 +57,11 @@ npm run lint             # oxlint
   `GET /api/products?search=…&category=…` только через 400 мс после последнего ввода
   (`useDebounce`). Если параметры изменились до прихода ответа, устаревший запрос отменяется
   `AbortController`, поэтому старый ответ не перезапишет новый.
+- **Дополнительное улучшение — пагинация каталога**: товары загружаются по 6 штук
+  (`GET /api/products?limit=6&offset=…`). Кнопка «Показать ещё (осталось N)» догружает следующую
+  страницу и добавляет её к уже показанным. Над списком написано «Показано X из Y». При смене
+  поиска или категории список начинается с первой страницы, а незавершённая догрузка отменяется.
+  Если догрузка не удалась, рядом с кнопкой появляется ошибка, а сама кнопка становится «Повторить».
 - Из лаб. №24 сохранены фильтрация и сортировка загруженной корзины на клиенте, статистика,
   `document.title` с числом единиц в корзине и `React.memo` для строк.
 
@@ -71,7 +76,9 @@ npm run lint             # oxlint
 
  api.js: интерцептор добавляет  Authorization: Bearer <token>  к каждому запросу
                                                            cors() → auth (jwt.verify) → контроллер
- CartForm ── fetchProducts() ─ GET /api/products?search= ─▶ Product.findAll(iLike) ──────▶ Products
+ CartForm ── fetchProducts() ─ GET /api/products?search=&limit=6&offset=
+                                                         ─▶ findAndCountAll(iLike) ─────▶ Products
+          ◀──────────────── { data: [...], meta: { total, hasMore } } ──
  useCart  ── fetchCart() ───── GET /api/cart ─────────────▶ CartItem.findAll ────────────▶ CartItems
           ── addCartItem() ─── POST /api/cart/items ──────▶ транзакция: create/increment
           ── updateCartItem()─ PUT /api/cart/items/:id ───▶ проверка размера/остатка, update
@@ -93,7 +100,8 @@ src/
   hooks/useNotifications.js  — очередь всплывающих уведомлений
   components/LoginForm.jsx   — форма входа/регистрации
   components/CartList.jsx    — основной компонент корзины: состояния загрузки/ошибки, фильтры, сортировка
-  components/CartForm.jsx    — поиск по каталогу на сервере (debounce + AbortController) и добавление
+  components/CartForm.jsx    — поиск по каталогу на сервере (debounce + AbortController),
+                               «Показать ещё» (limit/offset) и добавление
   components/CartItemRow.jsx — строка корзины, редактирование (React.memo)
   components/CartStats.jsx   — блок «Итого» и индикатор синхронизации
   components/Toasts.jsx      — уведомления с автоскрытием
@@ -101,5 +109,4 @@ src/
   utils/validateItem.js      — проверка размера и количества перед отправкой
 ```
 
-Ответы на контрольные вопросы — [ANSWERS.md](ANSWERS.md) (лаб. №25) и
-[ANSWERS-lab24.md](ANSWERS-lab24.md) (лаб. №24). Материалы для отчёта — [REPORT-lab25.md](REPORT-lab25.md).
+Материалы для отчёта — [REPORT-lab25.md](REPORT-lab25.md).

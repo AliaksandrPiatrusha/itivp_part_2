@@ -122,6 +122,10 @@ input:focus-visible, select:focus-visible, button:focus-visible {
 .product-price { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 600; }
 .product-price .muted { font-weight: 400; font-size: 0.8rem; }
 
+.load-more { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.load-more .btn { display: inline-flex; align-items: center; gap: 8px; }
+.load-more .error { min-height: 0; }
+
 .add-form {
   display: grid;
   grid-template-columns: 1fr 100px 90px auto;

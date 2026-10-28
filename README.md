@@ -16,8 +16,9 @@
 
 В лаб. №25 клиент переведён с `localStorage` на этот REST API: вход по JWT, загрузка корзины
 с сервера, CRUD с оптимистичным обновлением и откатом при ошибке, поиск по каталогу на сервере
-с debounce. На сервере добавлены CORS (пакет `cors`), параметр `search` у `GET /api/products`
-и смена размера в `PUT /api/cart/items/:itemId`. Подробнее — [`client/README.md`](client/README.md).
+с debounce, постраничная загрузка каталога с кнопкой «Показать ещё». На сервере добавлены CORS
+(пакет `cors`), параметры `search`, `limit`, `offset` у `GET /api/products`, смена размера
+в `PUT /api/cart/items/:itemId` и сид с дополнительными товарами. Подробнее — [`client/README.md`](client/README.md).
 
 ## Стек
 
@@ -61,6 +62,8 @@ npm run db:seed
 Сид создаёт администратора `admin@shop.local` / `Admin123!` (переопределяется переменными
 `ADMIN_EMAIL` и `ADMIN_PASSWORD`). Если товары уже засеяны, достаточно запустить только этот сид:
 `npx sequelize-cli db:seed --seed 20260930100200-admin-user.js`.
+Дополнительные 14 товаров для постраничного каталога (лаб. №25):
+`npx sequelize-cli db:seed --seed 20261028120000-more-products.js`.
 
 Запустите сервер:
 
@@ -170,11 +173,15 @@ npm run dev
 
 | Метод | Маршрут | Назначение | Доступ | Успех | Ошибки |
 |---|---|---|---|---|---|
-| GET | `/api/products` | Каталог, фильтры `?category=&size=&maxPrice=&search=` (`search` — подстрока названия или цвета без учёта регистра) | — | 200 | — |
+| GET | `/api/products` | Каталог, фильтры `?category=&size=&maxPrice=&search=` (`search` — подстрока названия или цвета без учёта регистра), пагинация `?limit=&offset=` | — | 200 | 400 |
 | GET | `/api/products/:id` | Товар по ID | — | 200 | 400, 404 |
 | POST | `/api/products` | Добавить товар | admin | 201 | 400, 401, 403 |
 | PUT | `/api/products/:id` | Полная замена товара | admin | 200 | 400, 401, 403, 404 |
 | DELETE | `/api/products/:id` | Удалить товар | admin | 204 | 400, 401, 403, 404 |
+
+Ответ `GET /api/products` содержит `meta`: `{ total, limit, offset, hasMore }`, где `total` — число
+товаров, подходящих под фильтры. `limit` — от 1 до 100. Без `limit` возвращается весь список
+(`limit: null`). Пример: `GET /api/products?limit=6&offset=6` — вторая страница по 6 товаров.
 
 ### Корзина
 
@@ -290,5 +297,4 @@ curl -i -X PATCH http://localhost:3000/api/orders/1/status \
 
 ## Дальнейшее развитие
 
-Оформление заказа из React-клиента (`POST /api/orders`), пагинация каталога, валидация
-на уровне схем.
+Оформление заказа из React-клиента (`POST /api/orders`), валидация на уровне схем.

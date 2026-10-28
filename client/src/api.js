@@ -49,15 +49,20 @@ export const register = (email, password) => api.post('/auth/register', { email,
 
 /* ---------- Каталог ---------- */
 
-// search и category обрабатываются на сервере; signal позволяет отменить устаревший запрос.
-export const fetchProducts = ({ search, category } = {}, signal) =>
+// search, category и пагинация (limit/offset) обрабатываются на сервере;
+// signal позволяет отменить устаревший запрос. Возвращает { items, total, hasMore }.
+export const fetchProducts = ({ search, category, limit, offset } = {}, signal) =>
   api.get('/products', {
     params: {
       ...(search ? { search } : {}),
-      ...(category && category !== 'all' ? { category } : {})
+      ...(category && category !== 'all' ? { category } : {}),
+      ...(limit ? { limit, offset: offset ?? 0 } : {})
     },
     signal
-  }).then(unwrap);
+  }).then(response => {
+    const { data, meta } = response.data;
+    return { items: data, total: meta?.total ?? data.length, hasMore: Boolean(meta?.hasMore) };
+  });
 
 /* ---------- Корзина (CRUD) ---------- */
 
