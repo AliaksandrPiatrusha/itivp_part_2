@@ -1,101 +1,158 @@
-import { useState } from 'react';
-import { CATEGORIES, SIZES } from '../data/catalog';
-import validateItem from '../utils/validateItem';
+import { useEffect, useState } from 'react';
+import { fetchProducts, getErrorMessage, isCanceled } from '../api';
+import { CATEGORIES, categoryLabel, formatPrice } from '../data/catalog';
+import useDebounce from '../hooks/useDebounce';
+import validateItem, { quantityLimit } from '../utils/validateItem';
 
-const EMPTY_FORM = { title: '', category: 'tshirts', size: 'M', color: '', price: '', quantity: '1' };
+const SEARCH_DEBOUNCE_MS = 400;
 
-/** Форма добавления позиции в корзину (контролируемые поля). */
+const defaultSize = sizes => (sizes.includes('M') ? 'M' : sizes[0] ?? '');
+
+/**
+ * Добавление товара в корзину: поиск по каталогу на сервере (GET /api/products?search=)
+ * с debounce ввода и отменой устаревших запросов, затем выбор размера и количества.
+ */
 export default function CartForm({ onAdd }) {
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('all');
+  const [reloadKey, setReloadKey] = useState(0);
+  // Результат последнего завершённого запроса и «ключ» параметров, для которых он получен.
+  const [result, setResult] = useState({ key: null, products: [], error: null });
+
+  const [selected, setSelected] = useState(null);
+  const [size, setSize] = useState('');
+  const [quantity, setQuantity] = useState('1');
   const [error, setError] = useState(null);
 
-  const handleChange = e => {
-    const { name, value } = e.target;
-    // Обновление на основе предыдущего состояния.
-    setForm(prev => ({ ...prev, [name]: value }));
+  // Запрос уходит только через 400 мс после последнего нажатия клавиши.
+  const debouncedSearch = useDebounce(search.trim(), SEARCH_DEBOUNCE_MS);
+  const requestKey = `${debouncedSearch}|${category}|${reloadKey}`;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchProducts({ search: debouncedSearch, category }, controller.signal)
+      .then(products => setResult({ key: requestKey, products, error: null }))
+      .catch(err => {
+        if (!isCanceled(err)) setResult({ key: requestKey, products: [], error: getErrorMessage(err) });
+      });
+    // Параметры поиска изменились или компонент размонтирован — прерываем устаревший запрос,
+    // чтобы его ответ не перезаписал более свежий результат.
+    return () => controller.abort();
+  }, [debouncedSearch, category, reloadKey, requestKey]);
+
+  // Загрузка и ожидание debounce вычисляются из состояния, а не хранятся отдельно.
+  const isLoading = result.key !== requestKey;
+  const isTyping = search.trim() !== debouncedSearch;
+  const { products, error: loadError } = result;
+
+  const selectProduct = product => {
+    setSelected(product);
+    setSize(defaultSize(product.sizes));
+    setQuantity('1');
     setError(null);
   };
 
-  // Enter в любом поле отправляет форму — стандартное поведение <form onSubmit>.
   const handleSubmit = e => {
     e.preventDefault();
-    const message = validateItem(form);
+    if (!selected) {
+      setError('Выберите товар из каталога');
+      return;
+    }
+    const message = validateItem({ size, sizes: selected.sizes, quantity, stock: selected.stock });
     if (message) {
       setError(message);
       return;
     }
-    onAdd({
-      title: form.title.trim(),
-      category: form.category,
-      size: form.size,
-      color: form.color.trim(),
-      price: Math.round(Number(form.price) * 100) / 100,
-      quantity: Number(form.quantity)
-    });
-    setForm(prev => ({ ...EMPTY_FORM, category: prev.category }));
+    // Оптимистичное добавление: форма сразу готова к следующему товару, ответ сервера не ждём.
+    onAdd(selected, size, Number(quantity));
+    setQuantity('1');
   };
 
+  const max = selected ? quantityLimit(selected.stock) : 1;
+
   return (
-    <form className="card cart-form" onSubmit={handleSubmit} noValidate>
-      <h2>Добавить товар</h2>
-      <div className="form-grid">
-        <label className="field field-wide">
-          <span>Название</span>
-          <input
-            name="title"
-            value={form.title}
-            onChange={handleChange}
-            placeholder="Например, Куртка Parka"
-            autoComplete="off"
-          />
-        </label>
-        <label className="field">
-          <span>Категория</span>
-          <select name="category" value={form.category} onChange={handleChange}>
-            {CATEGORIES.map(c => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-        </label>
+    <div className="card cart-form">
+      <div className="list-header">
+        <h2>Добавить товар</h2>
+        <span className="save-status" aria-live="polite">
+          {isTyping ? 'Ввод…' : isLoading ? 'Поиск на сервере…' : loadError ? '' : `Найдено: ${products.length}`}
+        </span>
+      </div>
+
+      <div className="toolbar toolbar-2">
+        <input
+          type="search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Поиск в каталоге по названию или цвету"
+          aria-label="Поиск в каталоге"
+        />
+        <select value={category} onChange={e => setCategory(e.target.value)} aria-label="Категория каталога">
+          <option value="all">Все категории</option>
+          {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+        </select>
+      </div>
+
+      {loadError && !isLoading ? (
+        <div className="placeholder placeholder-error">
+          <span>{loadError}</span>
+          <button type="button" className="btn" onClick={() => setReloadKey(k => k + 1)}>Повторить</button>
+        </div>
+      ) : products.length === 0 && !isLoading ? (
+        <p className="placeholder">
+          {debouncedSearch ? `По запросу «${debouncedSearch}» ничего не найдено.` : 'В этой категории нет товаров.'}
+        </p>
+      ) : (
+        <ul className={`catalog ${isLoading ? 'is-loading' : ''}`} aria-busy={isLoading}>
+          {products.map(p => (
+            <li key={p.id}>
+              <button
+                type="button"
+                className={`product ${selected?.id === p.id ? 'selected' : ''}`}
+                onClick={() => selectProduct(p)}
+                disabled={p.stock < 1}
+                aria-pressed={selected?.id === p.id}
+              >
+                <span className="badge">{categoryLabel(p.category)}</span>
+                <strong>{p.title}</strong>
+                <span className="muted">{p.color || 'цвет не указан'} · {p.sizes.join(', ')}</span>
+                <span className="product-price">
+                  {formatPrice(p.price)}
+                  <span className="muted">{p.stock > 0 ? `в наличии ${p.stock}` : 'нет в наличии'}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+          {isLoading && products.length === 0 && (
+            <li className="placeholder"><span className="spinner" aria-hidden="true" />Загрузка каталога…</li>
+          )}
+        </ul>
+      )}
+
+      <form className="add-form" onSubmit={handleSubmit} noValidate>
+        <p className="add-form-title">
+          {selected ? <>Выбран: <strong>{selected.title}</strong> · {formatPrice(selected.price)}</> : 'Товар не выбран'}
+        </p>
         <label className="field">
           <span>Размер</span>
-          <select name="size" value={form.size} onChange={handleChange}>
-            {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+          <select value={size} onChange={e => { setSize(e.target.value); setError(null); }} disabled={!selected}>
+            {(selected?.sizes ?? []).map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-        </label>
-        <label className="field">
-          <span>Цвет</span>
-          <input name="color" value={form.color} onChange={handleChange} placeholder="белый" />
-        </label>
-        <label className="field">
-          <span>Цена, BYN</span>
-          <input
-            name="price"
-            type="number"
-            min="0.01"
-            step="0.01"
-            inputMode="decimal"
-            value={form.price}
-            onChange={handleChange}
-            placeholder="0.00"
-          />
         </label>
         <label className="field">
           <span>Кол-во</span>
           <input
-            name="quantity"
             type="number"
             min="1"
-            max="99"
-            value={form.quantity}
-            onChange={handleChange}
+            max={max}
+            value={quantity}
+            onChange={e => { setQuantity(e.target.value); setError(null); }}
+            disabled={!selected}
           />
         </label>
-      </div>
-      <div className="form-footer">
-        <p className="error" role="alert">{error}</p>
-        <button type="submit" className="btn btn-primary">Добавить в корзину</button>
-      </div>
-    </form>
+        <button type="submit" className="btn btn-primary" disabled={!selected}>Добавить в корзину</button>
+      </form>
+      <p className="error" role="alert">{error}</p>
+    </div>
   );
 }

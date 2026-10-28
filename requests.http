@@ -63,6 +63,9 @@ GET {{host}}/products
 ###
 GET {{host}}/products?category=jeans&size=L
 
+### Поиск по названию/цвету без учёта регистра (лаб. №25)
+GET {{host}}/products?search=джин
+
 ###
 GET {{host}}/products/999
 
@@ -158,6 +161,20 @@ Content-Type: application/json
 Authorization: Bearer {{userToken}}
 
 { "quantity": 3 }
+
+### Смена размера позиции (лаб. №25); размер должен быть у товара и не дублировать другую позицию
+PUT {{host}}/cart/items/1
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{ "size": "M" }
+
+### Количество больше остатка на складе -> 409
+PUT {{host}}/cart/items/1
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{ "quantity": 9999 }
 
 ###
 DELETE {{host}}/cart/items/1

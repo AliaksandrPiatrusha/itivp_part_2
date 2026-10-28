@@ -14,20 +14,26 @@
 В лаб. №24 добавлен клиент на React + Vite в папке [`client/`](client/README.md): корзина
 с хранением в `localStorage`, фильтрацией, сортировкой и автосохранением (`useState`, `useEffect`).
 
+В лаб. №25 клиент переведён с `localStorage` на этот REST API: вход по JWT, загрузка корзины
+с сервера, CRUD с оптимистичным обновлением и откатом при ошибке, поиск по каталогу на сервере
+с debounce. На сервере добавлены CORS (пакет `cors`), параметр `search` у `GET /api/products`
+и смена размера в `PUT /api/cart/items/:itemId`. Подробнее — [`client/README.md`](client/README.md).
+
 ## Стек
 
 - Node.js
-- Express 4
+- Express 4, cors
 - PostgreSQL + Sequelize 6 (ORM), sequelize-cli (миграции и сиды)
 - jsonwebtoken (JWT), bcrypt (хеширование паролей)
 - nodemon (dev)
+- Клиент: React 19 + Vite, axios
 
 ## Установка и запуск
 
 ```bash
 git clone https://github.com/AliaksandrPiatrusha/itivp_part_2.git
 cd itivp_part_2
-git checkout lab23
+git checkout lab25
 npm install
 ```
 
@@ -38,9 +44,11 @@ DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/clothing_store_lab2
 PORT=3000
 JWT_SECRET=<длинная случайная строка>
 JWT_EXPIRES_IN=1h
+CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-Без `JWT_SECRET` сервер не запустится. Сгенерировать секрет можно командой
+`CORS_ORIGIN` — адреса React-клиента, которым разрешены запросы из браузера (по умолчанию
+dev-сервер Vite на порту 5173). Без `JWT_SECRET` сервер не запустится. Сгенерировать секрет можно командой
 `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`.
 
 Примените миграции и наполните базу тестовыми данными:
@@ -61,6 +69,15 @@ npm run dev
 ```
 
 Сервер стартует на `http://localhost:3000`. Порт можно переопределить переменной окружения `PORT`.
+
+Запустите клиент (во втором терминале) и откройте `http://localhost:5173`:
+
+```bash
+cd client
+npm install
+copy .env.example .env   # Linux/macOS: cp .env.example .env
+npm run dev
+```
 
 Скрипты:
 
@@ -153,7 +170,7 @@ npm run dev
 
 | Метод | Маршрут | Назначение | Доступ | Успех | Ошибки |
 |---|---|---|---|---|---|
-| GET | `/api/products` | Каталог, фильтры `?category=&size=&maxPrice=` | — | 200 | — |
+| GET | `/api/products` | Каталог, фильтры `?category=&size=&maxPrice=&search=` (`search` — подстрока названия или цвета без учёта регистра) | — | 200 | — |
 | GET | `/api/products/:id` | Товар по ID | — | 200 | 400, 404 |
 | POST | `/api/products` | Добавить товар | admin | 201 | 400, 401, 403 |
 | PUT | `/api/products/:id` | Полная замена товара | admin | 200 | 400, 401, 403, 404 |
@@ -167,9 +184,14 @@ npm run dev
 |---|---|---|---|---|---|
 | GET | `/api/cart` | Содержимое корзины и сумма | auth | 200 | 401 |
 | POST | `/api/cart/items` | Добавить позицию | auth | 201 | 400, 401, 409 |
-| PUT | `/api/cart/items/:itemId` | Изменить количество | auth | 200 | 400, 401, 404 |
+| PUT | `/api/cart/items/:itemId` | Изменить количество и/или размер (`{ quantity?, size? }`) | auth | 200 | 400, 401, 404, 409 |
 | DELETE | `/api/cart/items/:itemId` | Удалить позицию | auth | 200 | 400, 401, 404 |
 | DELETE | `/api/cart` | Очистить корзину | auth | 204 | 401 |
+
+Ответы `GET`, `POST`, `PUT` и `DELETE` позиции содержат `{ items, total }`. `POST` и `PUT`
+дополнительно возвращают `item` — добавленную/изменённую позицию с реальным `id`. Каждая позиция
+включает сведения о товаре (`category`, `color`, `sizes`, `stock`) и `createdAt`. `PUT` возвращает
+409, если количество больше остатка на складе или позиция с выбранным размером уже есть в корзине.
 
 ### Заказы
 
@@ -268,5 +290,5 @@ curl -i -X PATCH http://localhost:3000/api/orders/1/status \
 
 ## Дальнейшее развитие
 
-Подключение React-клиента из `client/` к этому API с авторизацией запросов через JWT
-(лаб. №25), валидация на уровне схем.
+Оформление заказа из React-клиента (`POST /api/orders`), пагинация каталога, валидация
+на уровне схем.

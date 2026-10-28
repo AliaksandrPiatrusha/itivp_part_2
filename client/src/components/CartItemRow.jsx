@@ -1,14 +1,20 @@
 import { memo, useState } from 'react';
-import { SIZES, categoryLabel, formatPrice } from '../data/catalog';
-import validateItem from '../utils/validateItem';
+import { categoryLabel, formatPrice } from '../data/catalog';
+import validateItem, { quantityLimit } from '../utils/validateItem';
 
-/** Строка корзины: просмотр, изменение количества, редактирование и удаление. */
-function CartItemRow({ item, isEditing, onStartEdit, onCancelEdit, onSave, onRemove, onChangeQuantity }) {
+/**
+ * Строка корзины: изменение количества (−/+), редактирование размера и количества, удаление.
+ * Пока по позиции идёт запрос к серверу (isPending), действия заблокированы и показан спиннер.
+ */
+function CartItemRow({ item, isEditing, isPending, onStartEdit, onCancelEdit, onUpdate, onRemove }) {
   const [draft, setDraft] = useState(null);
   const [error, setError] = useState(null);
 
+  const max = quantityLimit(item.stock);
+  const locked = isPending || item.isTemp;
+
   const startEdit = () => {
-    setDraft({ title: item.title, size: item.size, color: item.color, price: String(item.price), quantity: String(item.quantity) });
+    setDraft({ size: item.size, quantity: String(item.quantity) });
     setError(null);
     onStartEdit(item.id);
   };
@@ -20,18 +26,17 @@ function CartItemRow({ item, isEditing, onStartEdit, onCancelEdit, onSave, onRem
   };
 
   const save = () => {
-    const message = validateItem(draft);
+    const message = validateItem({ ...draft, sizes: item.sizes, stock: item.stock });
     if (message) {
       setError(message);
       return;
     }
-    onSave(item.id, {
-      title: draft.title.trim(),
-      size: draft.size,
-      color: draft.color.trim(),
-      price: Math.round(Number(draft.price) * 100) / 100,
-      quantity: Number(draft.quantity)
-    });
+    // На сервер уходят только реально изменённые поля.
+    const changes = {};
+    if (draft.size !== item.size) changes.size = draft.size;
+    if (Number(draft.quantity) !== item.quantity) changes.quantity = Number(draft.quantity);
+    onCancelEdit();
+    if (Object.keys(changes).length > 0) onUpdate(item.id, changes);
   };
 
   // Горячие клавиши в режиме редактирования: Enter — сохранить, Escape — отменить.
@@ -47,14 +52,21 @@ function CartItemRow({ item, isEditing, onStartEdit, onCancelEdit, onSave, onRem
   if (isEditing && draft) {
     return (
       <li className="cart-item editing" onKeyDown={handleKeyDown}>
+        <div className="item-main">
+          <h3>{item.title}</h3>
+          <p className="muted">{formatPrice(item.price)} за шт. · на складе {item.stock ?? '—'}</p>
+        </div>
         <div className="edit-grid">
-          <input name="title" value={draft.title} onChange={handleChange} aria-label="Название" autoFocus />
-          <select name="size" value={draft.size} onChange={handleChange} aria-label="Размер">
-            {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <input name="color" value={draft.color} onChange={handleChange} aria-label="Цвет" placeholder="цвет" />
-          <input name="price" type="number" min="0.01" step="0.01" value={draft.price} onChange={handleChange} aria-label="Цена" />
-          <input name="quantity" type="number" min="1" max="99" value={draft.quantity} onChange={handleChange} aria-label="Количество" />
+          <label className="field">
+            <span>Размер</span>
+            <select name="size" value={draft.size} onChange={handleChange} autoFocus>
+              {item.sizes.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>Кол-во</span>
+            <input name="quantity" type="number" min="1" max={max} value={draft.quantity} onChange={handleChange} />
+          </label>
         </div>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="item-actions">
@@ -66,23 +78,39 @@ function CartItemRow({ item, isEditing, onStartEdit, onCancelEdit, onSave, onRem
   }
 
   return (
-    <li className="cart-item">
+    <li className={`cart-item ${locked ? 'pending' : ''}`} aria-busy={locked}>
       <div className="item-main">
         <span className="badge">{categoryLabel(item.category)}</span>
-        <h3>{item.title}</h3>
+        <h3>
+          {item.title}
+          {locked && <span className="spinner spinner-sm" title="Синхронизация с сервером" />}
+        </h3>
         <p className="muted">
           Размер {item.size}{item.color ? ` · ${item.color}` : ''} · {formatPrice(item.price)} за шт.
+          {item.isTemp && ' · сохраняется…'}
         </p>
       </div>
       <div className="qty" aria-label="Количество">
-        <button type="button" className="btn btn-icon" onClick={() => onChangeQuantity(item.id, -1)} disabled={item.quantity <= 1} aria-label="Уменьшить">−</button>
+        <button
+          type="button"
+          className="btn btn-icon"
+          onClick={() => onUpdate(item.id, { quantity: item.quantity - 1 })}
+          disabled={locked || item.quantity <= 1}
+          aria-label="Уменьшить"
+        >−</button>
         <span>{item.quantity}</span>
-        <button type="button" className="btn btn-icon" onClick={() => onChangeQuantity(item.id, 1)} disabled={item.quantity >= 99} aria-label="Увеличить">+</button>
+        <button
+          type="button"
+          className="btn btn-icon"
+          onClick={() => onUpdate(item.id, { quantity: item.quantity + 1 })}
+          disabled={locked || item.quantity >= max}
+          aria-label="Увеличить"
+        >+</button>
       </div>
       <strong className="item-total">{formatPrice(item.price * item.quantity)}</strong>
       <div className="item-actions">
-        <button type="button" className="btn" onClick={startEdit}>Изменить</button>
-        <button type="button" className="btn btn-danger" onClick={() => onRemove(item.id)}>Удалить</button>
+        <button type="button" className="btn" onClick={startEdit} disabled={locked}>Изменить</button>
+        <button type="button" className="btn btn-danger" onClick={() => onRemove(item.id)} disabled={locked}>Удалить</button>
       </div>
     </li>
   );

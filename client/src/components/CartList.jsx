@@ -1,36 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import useLocalStorage from '../hooks/useLocalStorage';
-import { CATEGORIES, INITIAL_CART, formatPrice } from '../data/catalog';
+import useCart from '../hooks/useCart';
+import { CATEGORIES, formatPrice } from '../data/catalog';
 import CartForm from './CartForm';
 import CartItemRow from './CartItemRow';
 import CartStats from './CartStats';
 
-const STORAGE_KEY = 'clothing-store:cart';
-
 const SORTS = {
-  newest: { label: 'Сначала новые', compare: (a, b) => b.createdAt.localeCompare(a.createdAt) },
+  newest: { label: 'Сначала новые', compare: (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) },
   title: { label: 'По названию (А–Я)', compare: (a, b) => a.title.localeCompare(b.title, 'ru') },
   'price-asc': { label: 'Цена ↑', compare: (a, b) => a.price - b.price },
   'price-desc': { label: 'Цена ↓', compare: (a, b) => b.price - a.price },
   'total-desc': { label: 'Сумма позиции ↓', compare: (a, b) => b.price * b.quantity - a.price * a.quantity }
 };
 
-const SAVE_LABELS = {
-  idle: '',
-  pending: 'Сохранение…',
-  saved: 'Сохранено',
-  error: 'Не удалось сохранить'
-};
-
-/** Корзина интернет-магазина одежды: список позиций, фильтры, сортировка, статистика. */
-export default function CartList() {
-  const { value: items, setValue: setItems, isLoading, saveStatus, lastSavedAt } =
-    useLocalStorage(STORAGE_KEY, INITIAL_CART);
+/** Корзина интернет-магазина одежды, синхронизированная с REST API. */
+export default function CartList({ notify }) {
+  const { items, status, loadError, reload, pending, isSyncing, addItem, updateItem, removeItem, clear } =
+    useCart(notify);
 
   const [category, setCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
   const [editingId, setEditingId] = useState(null);
+
+  const isLoading = status === 'loading';
 
   // Заголовок вкладки отражает состояние корзины; при размонтировании возвращается исходный.
   useEffect(() => {
@@ -42,45 +35,17 @@ export default function CartList() {
     };
   }, [items, isLoading]);
 
-  // Добавление: тот же товар того же размера и цвета увеличивает количество, а не дублируется.
-  const handleAdd = useCallback(newItem => {
-    setItems(prev => {
-      const same = prev.find(i =>
-        i.title.toLowerCase() === newItem.title.toLowerCase() &&
-        i.size === newItem.size &&
-        i.color.toLowerCase() === newItem.color.toLowerCase()
-      );
-      if (same) {
-        return prev.map(i =>
-          i.id === same.id ? { ...i, quantity: Math.min(99, i.quantity + newItem.quantity), price: newItem.price } : i
-        );
-      }
-      return [...prev, { ...newItem, id: crypto.randomUUID(), createdAt: new Date().toISOString() }];
-    });
-  }, [setItems]);
-
   const handleRemove = useCallback(id => {
-    setItems(prev => prev.filter(i => i.id !== id));
     setEditingId(current => (current === id ? null : current));
-  }, [setItems]);
-
-  const handleSave = useCallback((id, changes) => {
-    setItems(prev => prev.map(i => (i.id === id ? { ...i, ...changes } : i)));
-    setEditingId(null);
-  }, [setItems]);
-
-  const handleChangeQuantity = useCallback((id, delta) => {
-    setItems(prev => prev.map(i =>
-      i.id === id ? { ...i, quantity: Math.min(99, Math.max(1, i.quantity + delta)) } : i
-    ));
-  }, [setItems]);
+    removeItem(id);
+  }, [removeItem]);
 
   const handleCancelEdit = useCallback(() => setEditingId(null), []);
 
   const handleClear = () => {
     if (window.confirm('Удалить все товары из корзины?')) {
-      setItems([]);
       setEditingId(null);
+      clear();
     }
   };
 
@@ -90,12 +55,12 @@ export default function CartList() {
     setSort('newest');
   };
 
-  // Фильтрация и сортировка пересчитываются только при изменении входных данных.
+  // Фильтрация и сортировка уже загруженной корзины выполняются на клиенте.
   const visibleItems = useMemo(() => {
     const query = search.trim().toLowerCase();
     return items
       .filter(i => category === 'all' || i.category === category)
-      .filter(i => !query || i.title.toLowerCase().includes(query) || i.color.toLowerCase().includes(query))
+      .filter(i => !query || i.title.toLowerCase().includes(query) || (i.color || '').toLowerCase().includes(query))
       .sort(SORTS[sort].compare);
   }, [items, category, search, sort]);
 
@@ -108,18 +73,59 @@ export default function CartList() {
 
   const isFiltered = category !== 'all' || search.trim() !== '';
 
+  let content;
+  if (isLoading) {
+    content = (
+      <div className="placeholder">
+        <span className="spinner" aria-hidden="true" />
+        Загрузка корзины с сервера…
+      </div>
+    );
+  } else if (status === 'error') {
+    content = (
+      <div className="placeholder placeholder-error" role="alert">
+        <span>Не удалось загрузить корзину. {loadError}</span>
+        <button type="button" className="btn btn-primary" onClick={reload}>Повторить</button>
+      </div>
+    );
+  } else if (items.length === 0) {
+    content = <p className="placeholder">Корзина пуста — найдите товар в каталоге выше.</p>;
+  } else if (visibleItems.length === 0) {
+    content = (
+      <p className="placeholder">
+        Ничего не найдено. <button type="button" className="link" onClick={resetFilters}>Сбросить фильтры</button>
+      </p>
+    );
+  } else {
+    content = (
+      <ul className="cart-items">
+        {visibleItems.map(item => (
+          <CartItemRow
+            key={item.id}
+            item={item}
+            isEditing={editingId === item.id}
+            isPending={Boolean(pending[item.id])}
+            onStartEdit={setEditingId}
+            onCancelEdit={handleCancelEdit}
+            onUpdate={updateItem}
+            onRemove={handleRemove}
+          />
+        ))}
+      </ul>
+    );
+  }
+
   return (
     <div className="layout">
       <section className="main-column">
-        <CartForm onAdd={handleAdd} />
+        <CartForm onAdd={addItem} />
 
         <div className="card">
           <div className="list-header">
             <h2>Корзина</h2>
-            <span className={`save-status save-${saveStatus}`} aria-live="polite">
-              {SAVE_LABELS[saveStatus]}
-              {saveStatus === 'saved' && lastSavedAt && ` в ${lastSavedAt.toLocaleTimeString('ru-RU')}`}
-            </span>
+            {status === 'ready' && (
+              <button type="button" className="link" onClick={reload} disabled={isSyncing}>Обновить</button>
+            )}
           </div>
 
           <div className="toolbar">
@@ -127,8 +133,8 @@ export default function CartList() {
               type="search"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Поиск по названию или цвету"
-              aria-label="Поиск"
+              placeholder="Поиск в корзине по названию или цвету"
+              aria-label="Поиск в корзине"
             />
             <select value={category} onChange={e => setCategory(e.target.value)} aria-label="Категория">
               <option value="all">Все категории</option>
@@ -139,35 +145,9 @@ export default function CartList() {
             </select>
           </div>
 
-          {isLoading ? (
-            <div className="placeholder">
-              <span className="spinner" aria-hidden="true" />
-              Загрузка корзины с сервера…
-            </div>
-          ) : items.length === 0 ? (
-            <p className="placeholder">Корзина пуста — добавьте товар с помощью формы выше.</p>
-          ) : visibleItems.length === 0 ? (
-            <p className="placeholder">
-              Ничего не найдено. <button type="button" className="link" onClick={resetFilters}>Сбросить фильтры</button>
-            </p>
-          ) : (
-            <ul className="cart-items">
-              {visibleItems.map(item => (
-                <CartItemRow
-                  key={item.id}
-                  item={item}
-                  isEditing={editingId === item.id}
-                  onStartEdit={setEditingId}
-                  onCancelEdit={handleCancelEdit}
-                  onSave={handleSave}
-                  onRemove={handleRemove}
-                  onChangeQuantity={handleChangeQuantity}
-                />
-              ))}
-            </ul>
-          )}
+          {content}
 
-          {!isLoading && isFiltered && visibleItems.length > 0 && (
+          {status === 'ready' && isFiltered && visibleItems.length > 0 && (
             <p className="muted filter-summary">
               Показано {visibleItems.length} из {items.length} · на сумму {formatPrice(stats.visibleTotal)}
             </p>
@@ -176,7 +156,7 @@ export default function CartList() {
       </section>
 
       <aside className="side-column">
-        <CartStats stats={stats} isLoading={isLoading} onClear={handleClear} />
+        <CartStats stats={stats} isLoading={status !== 'ready'} isSyncing={isSyncing} onClear={handleClear} />
       </aside>
     </div>
   );

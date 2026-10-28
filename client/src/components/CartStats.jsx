@@ -1,10 +1,15 @@
 import { formatPrice } from '../data/catalog';
 
-/** Итоги корзины: количество позиций и единиц, средняя цена, общая сумма. */
-export default function CartStats({ stats, isLoading, onClear }) {
+/** Итоги корзины и индикатор фоновой синхронизации с сервером. */
+export default function CartStats({ stats, isLoading, isSyncing, onClear }) {
   return (
     <div className="card stats">
-      <h2>Итого</h2>
+      <div className="list-header">
+        <h2>Итого</h2>
+        <span className={`save-status ${isSyncing ? '' : 'save-saved'}`} aria-live="polite">
+          {isLoading ? '' : isSyncing ? <><span className="spinner spinner-sm" /> Сохранение…</> : 'Синхронизировано'}
+        </span>
+      </div>
       <dl>
         <div><dt>Позиций</dt><dd>{isLoading ? '—' : stats.positions}</dd></div>
         <div><dt>Единиц товара</dt><dd>{isLoading ? '—' : stats.units}</dd></div>
