@@ -16,23 +16,7 @@
   line-height: 1.45;
   color: var(--text);
   background: var(--bg);
-  color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111114;
-    --surface: #1c1c21;
-    --text: #f2f2f5;
-    --muted: #9a9aa3;
-    --border: #2e2e36;
-    --accent: #6d8dff;
-    --accent-text: #0b0b0f;
-    --danger: #ff6b81;
-    --success: #4cd38a;
-    --badge-bg: #262b45;
-    --bg-gradient: linear-gradient(135deg, #10132a 0%, #18122a 50%, #24141e 100%);
-  }
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
