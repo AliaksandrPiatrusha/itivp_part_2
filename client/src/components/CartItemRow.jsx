@@ -1,13 +1,14 @@
 import { memo, useState } from 'react';
 import { categoryLabel, formatPrice } from '../data/catalog';
-import validateItem, { quantityLimit } from '../utils/validateItem';
+import validateItem from '../utils/validateItem';
 
-function CartItemRow({ item, isEditing, isPending, onStartEdit, onCancelEdit, onUpdate, onRemove }) {
+function CartItemRow({ item, isEditing, isPending, maxQuantity, onStartEdit, onCancelEdit, onUpdate, onRemove }) {
   const [draft, setDraft] = useState(null);
   const [error, setError] = useState(null);
 
-  const max = quantityLimit(item.stock);
+  const max = maxQuantity;
   const locked = isPending || item.isTemp;
+  const overStock = !item.isTemp && item.quantity > max;
 
   const startEdit = () => {
     setDraft({ size: item.size, quantity: String(item.quantity) });
@@ -22,7 +23,7 @@ function CartItemRow({ item, isEditing, isPending, onStartEdit, onCancelEdit, on
   };
 
   const save = () => {
-    const message = validateItem({ ...draft, sizes: item.sizes, stock: item.stock });
+    const message = validateItem({ ...draft, sizes: item.sizes, stock: max });
     if (message) {
       setError(message);
       return;
@@ -48,7 +49,9 @@ function CartItemRow({ item, isEditing, isPending, onStartEdit, onCancelEdit, on
       <li className="cart-item editing" onKeyDown={handleKeyDown}>
         <div className="item-main">
           <h3>{item.title}</h3>
-          <p className="muted">{formatPrice(item.price)} за шт. · на складе {item.stock ?? '—'}</p>
+          <p className="muted">
+            {formatPrice(item.price)} за шт. · на складе {item.stock ?? '—'} · для этой позиции доступно до {max}
+          </p>
         </div>
         <div className="edit-grid">
           <label className="field">
@@ -83,6 +86,11 @@ function CartItemRow({ item, isEditing, isPending, onStartEdit, onCancelEdit, on
           Размер {item.size}{item.color ? ` · ${item.color}` : ''} · {formatPrice(item.price)} за шт.
           {item.isTemp && ' · сохраняется…'}
         </p>
+        {overStock && (
+          <p className="error stock-warning">
+            На складе {item.stock}, для этой позиции доступно {max}: уменьшите количество
+          </p>
+        )}
       </div>
       <div className="qty" aria-label="Количество">
         <button

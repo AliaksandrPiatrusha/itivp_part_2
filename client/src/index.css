@@ -122,6 +122,7 @@ input:focus-visible, select:focus-visible, button:focus-visible {
 .load-more { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
 .load-more .btn { display: inline-flex; align-items: center; gap: 8px; }
 .load-more .error { min-height: 0; }
+.stock-warning { min-height: 0; font-size: 0.85rem; }
 
 .add-form {
   display: grid;

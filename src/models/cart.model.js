@@ -1,5 +1,16 @@
-const { UniqueConstraintError } = require('sequelize');
+const { Op, UniqueConstraintError } = require('sequelize');
 const { sequelize, CartItem, Product } = require('../db/models');
+const ApiError = require('../utils/ApiError');
+
+const stockError = (inCart, stock) => (stock <= 0
+  ? ApiError.conflict('Товара нет на складе', { stock, inCart })
+  : ApiError.conflict(`В корзине уже ${inCart} из ${stock} доступных`, { stock, inCart }));
+
+const quantityInCart = async (userId, productId, { excludeId, transaction } = {}) => {
+  const where = { userId, productId };
+  if (excludeId !== undefined) where.id = { [Op.ne]: excludeId };
+  return (await CartItem.sum('quantity', { where, transaction })) || 0;
+};
 
 const toDTO = item => ({
   id: item.id,
@@ -28,9 +39,13 @@ const findItem = (userId, id) => CartItem.findOne({ where: { id, userId } });
 
 const findSame = (userId, productId, size) => CartItem.findOne({ where: { userId, productId, size } });
 
-const addItem = async ({ userId, productId, title, size, price, quantity }) => {
+const addItem = async ({ userId, productId, title, size, price, quantity }, retried = false) => {
   try {
     return await sequelize.transaction(async transaction => {
+      const product = await Product.findByPk(productId, { transaction, lock: transaction.LOCK.UPDATE });
+      const inCart = await quantityInCart(userId, productId, { transaction });
+      if (inCart + quantity > product.stock) throw stockError(inCart, product.stock);
+
       const existing = await CartItem.findOne({
         where: { userId, productId, size },
         transaction,
@@ -42,9 +57,8 @@ const addItem = async ({ userId, productId, title, size, price, quantity }) => {
       return CartItem.create({ userId, productId, title, size, price, quantity }, { transaction });
     });
   } catch (err) {
-    if (err instanceof UniqueConstraintError) {
-      const existing = await findSame(userId, productId, size);
-      return existing.increment('quantity', { by: quantity });
+    if (err instanceof UniqueConstraintError && !retried) {
+      return addItem({ userId, productId, title, size, price, quantity }, true);
     }
     throw err;
   }
@@ -72,5 +86,6 @@ const total = items =>
   Number(items.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0).toFixed(2));
 
 module.exports = {
-  getItems, findItem, findItemWithProduct, findSame, addItem, updateItem, removeItem, clear, total
+  getItems, findItem, findItemWithProduct, findSame, quantityInCart, stockError,
+  addItem, updateItem, removeItem, clear, total
 };

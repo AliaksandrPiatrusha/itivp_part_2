@@ -24,9 +24,6 @@ const addItem = async (req, res) => {
     throw ApiError.badRequest(`Размер ${size} недоступен для этого товара`, product.sizes);
   }
   requirePositiveInt(quantity, 'quantity');
-  if (quantity > product.stock) {
-    throw ApiError.conflict('Недостаточно товара на складе', { stock: product.stock });
-  }
 
   await cart.addItem({
     userId: req.user.id,
@@ -56,8 +53,11 @@ const updateItem = async (req, res) => {
   const changes = {};
   if (quantity !== undefined) {
     requirePositiveInt(quantity, 'quantity');
-    if (item.product && quantity > item.product.stock) {
-      throw ApiError.conflict('Недостаточно товара на складе', { stock: item.product.stock });
+    if (item.product && quantity > item.quantity) {
+      const others = await cart.quantityInCart(req.user.id, item.productId, { excludeId: id });
+      if (others + quantity > item.product.stock) {
+        throw cart.stockError(others + item.quantity, item.product.stock);
+      }
     }
     changes.quantity = quantity;
   }

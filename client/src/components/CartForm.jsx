@@ -9,7 +9,7 @@ const PAGE_SIZE = 6;
 
 const defaultSize = sizes => (sizes.includes('M') ? 'M' : sizes[0] ?? '');
 
-export default function CartForm({ onAdd }) {
+export default function CartForm({ onAdd, inCart = {} }) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [reloadKey, setReloadKey] = useState(0);
@@ -75,13 +75,37 @@ export default function CartForm({ onAdd }) {
     setError(null);
   };
 
+  const inCartOf = product => inCart[product.id] || 0;
+  const availableOf = product => Math.max(0, product.stock - inCartOf(product));
+
+  const stockLabel = product => {
+    if (product.stock < 1) return 'нет в наличии';
+    const available = availableOf(product);
+    if (available === 0) return 'всё в корзине';
+    return inCartOf(product) > 0
+      ? `в наличии ${available} · в корзине ${inCartOf(product)}`
+      : `в наличии ${available}`;
+  };
+
   const handleSubmit = e => {
     e.preventDefault();
     if (!selected) {
       setError('Выберите товар из каталога');
       return;
     }
-    const message = validateItem({ size, sizes: selected.sizes, quantity, stock: selected.stock });
+    const already = inCartOf(selected);
+    const available = availableOf(selected);
+    if (selected.stock < 1) {
+      setError('Товара нет на складе');
+      return;
+    }
+    if (Number(quantity) > available) {
+      setError(available === 0
+        ? `В корзине уже ${already} из ${selected.stock} доступных`
+        : `В корзине уже ${already} из ${selected.stock} доступных, можно добавить ещё ${available}`);
+      return;
+    }
+    const message = validateItem({ size, sizes: selected.sizes, quantity, stock: available });
     if (message) {
       setError(message);
       return;
@@ -90,7 +114,9 @@ export default function CartForm({ onAdd }) {
     setQuantity('1');
   };
 
-  const max = selected ? quantityLimit(selected.stock) : 1;
+  const available = selected ? availableOf(selected) : 0;
+  const max = selected ? quantityLimit(available) : 1;
+  const canAdd = Boolean(selected) && available > 0;
 
   return (
     <div className="card cart-form">
@@ -140,7 +166,7 @@ export default function CartForm({ onAdd }) {
                 <span className="muted">{p.color || 'цвет не указан'} · {p.sizes.join(', ')}</span>
                 <span className="product-price">
                   {formatPrice(p.price)}
-                  <span className="muted">{p.stock > 0 ? `в наличии ${p.stock}` : 'нет в наличии'}</span>
+                  <span className="muted">{stockLabel(p)}</span>
                 </span>
               </button>
             </li>
@@ -167,7 +193,9 @@ export default function CartForm({ onAdd }) {
 
       <form className="add-form" onSubmit={handleSubmit} noValidate>
         <p className="add-form-title">
-          {selected ? <>Выбран: <strong>{selected.title}</strong> · {formatPrice(selected.price)}</> : 'Товар не выбран'}
+          {selected
+            ? <>Выбран: <strong>{selected.title}</strong> · {formatPrice(selected.price)} · {stockLabel(selected)}</>
+            : 'Товар не выбран'}
         </p>
         <label className="field">
           <span>Размер</span>
@@ -183,10 +211,10 @@ export default function CartForm({ onAdd }) {
             max={max}
             value={quantity}
             onChange={e => { setQuantity(e.target.value); setError(null); }}
-            disabled={!selected}
+            disabled={!canAdd}
           />
         </label>
-        <button type="submit" className="btn btn-primary" disabled={!selected}>Добавить в корзину</button>
+        <button type="submit" className="btn btn-primary" disabled={!canAdd}>Добавить в корзину</button>
       </form>
       <p className="error" role="alert">{error}</p>
     </div>

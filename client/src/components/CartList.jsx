@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import useCart from '../hooks/useCart';
 import { CATEGORIES, formatPrice } from '../data/catalog';
+import { quantityLimit } from '../utils/validateItem';
 import CartForm from './CartForm';
 import CartItemRow from './CartItemRow';
 import CartStats from './CartStats';
@@ -68,6 +69,17 @@ export default function CartList({ notify }) {
     return { positions: items.length, units, total, visibleTotal, average: units ? total / units : 0 };
   }, [items, visibleItems]);
 
+  const inCart = useMemo(() => {
+    const byProduct = {};
+    for (const i of items) byProduct[i.productId] = (byProduct[i.productId] || 0) + i.quantity;
+    return byProduct;
+  }, [items]);
+
+  const maxQuantityFor = item => {
+    if (!Number.isInteger(item.stock)) return quantityLimit(null);
+    return quantityLimit(item.stock - (inCart[item.productId] - item.quantity));
+  };
+
   const isFiltered = category !== 'all' || search.trim() !== '';
 
   let content;
@@ -102,6 +114,7 @@ export default function CartList({ notify }) {
             item={item}
             isEditing={editingId === item.id}
             isPending={Boolean(pending[item.id])}
+            maxQuantity={maxQuantityFor(item)}
             onStartEdit={setEditingId}
             onCancelEdit={handleCancelEdit}
             onUpdate={updateItem}
@@ -115,7 +128,7 @@ export default function CartList({ notify }) {
   return (
     <div className="layout">
       <section className="main-column">
-        <CartForm onAdd={addItem} />
+        <CartForm onAdd={addItem} inCart={inCart} />
 
         <div className="card">
           <div className="list-header">
