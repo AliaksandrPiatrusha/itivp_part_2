@@ -45,11 +45,12 @@ DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/clothing_store_lab2
 PORT=3000
 JWT_SECRET=<длинная случайная строка>
 JWT_EXPIRES_IN=1h
-CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173
+# CORS_ORIGIN=http://localhost:5173
 ```
 
-`CORS_ORIGIN` — адреса React-клиента, которым разрешены запросы из браузера (по умолчанию
-dev-сервер Vite на порту 5173). Без `JWT_SECRET` сервер не запустится. Сгенерировать секрет можно командой
+`CORS_ORIGIN` — необязательный список адресов React-клиента, которым разрешены запросы
+из браузера. Если он не задан, разрешены `http://localhost` и `http://127.0.0.1` на любом порту:
+Vite может запуститься на 5174 и далее, если порт 5173 занят. Без `JWT_SECRET` сервер не запустится. Сгенерировать секрет можно командой
 `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`.
 
 Примените миграции и наполните базу тестовыми данными:

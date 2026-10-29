@@ -6,12 +6,12 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-// React-клиент (лаб. №25) работает на другом origin (Vite, порт 5173), поэтому браузеру
-// нужно разрешение CORS. Список origin задаётся через CORS_ORIGIN (через запятую).
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
+// React-клиент (лаб. №25) работает на другом origin (Vite), поэтому браузеру нужно
+// разрешение CORS. Список origin задаётся через CORS_ORIGIN (через запятую). Если он не задан,
+// разрешён локальный клиент на любом порту: Vite переходит на 5174, 5175…, когда 5173 занят.
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
+  : [/^http:\/\/(localhost|127\.0\.0\.1):\d+$/];
 
 app.use(cors({
   origin: allowedOrigins,
