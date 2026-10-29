@@ -13,7 +13,6 @@ const SORTS = {
   'total-desc': { label: 'Сумма позиции ↓', compare: (a, b) => b.price * b.quantity - a.price * a.quantity }
 };
 
-/** Корзина интернет-магазина одежды, синхронизированная с REST API. */
 export default function CartList({ notify }) {
   const { items, status, loadError, reload, pending, isSyncing, addItem, updateItem, removeItem, clear } =
     useCart(notify);
@@ -25,7 +24,6 @@ export default function CartList({ notify }) {
 
   const isLoading = status === 'loading';
 
-  // Заголовок вкладки отражает состояние корзины; при размонтировании возвращается исходный.
   useEffect(() => {
     const previous = document.title;
     const count = items.reduce((sum, i) => sum + i.quantity, 0);
@@ -55,7 +53,6 @@ export default function CartList({ notify }) {
     setSort('newest');
   };
 
-  // Фильтрация и сортировка уже загруженной корзины выполняются на клиенте.
   const visibleItems = useMemo(() => {
     const query = search.trim().toLowerCase();
     return items

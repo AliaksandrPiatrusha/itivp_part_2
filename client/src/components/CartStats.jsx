@@ -1,6 +1,5 @@
 import { formatPrice } from '../data/catalog';
 
-/** Итоги корзины и индикатор фоновой синхронизации с сервером. */
 export default function CartStats({ stats, isLoading, isSyncing, onClear }) {
   return (
     <div className="card stats">

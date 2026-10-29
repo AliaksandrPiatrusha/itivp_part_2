@@ -5,23 +5,15 @@ import useDebounce from '../hooks/useDebounce';
 import validateItem, { quantityLimit } from '../utils/validateItem';
 
 const SEARCH_DEBOUNCE_MS = 400;
-// Сколько товаров каталога загружается за один запрос.
 const PAGE_SIZE = 6;
 
 const defaultSize = sizes => (sizes.includes('M') ? 'M' : sizes[0] ?? '');
 
-/**
- * Добавление товара в корзину: поиск по каталогу на сервере (GET /api/products?search=)
- * с debounce ввода и отменой устаревших запросов, постраничная загрузка (limit/offset)
- * с кнопкой «Показать ещё», затем выбор размера и количества.
- */
 export default function CartForm({ onAdd }) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [reloadKey, setReloadKey] = useState(0);
-  // Загруженные страницы каталога и «ключ» параметров поиска, для которых они получены.
   const [result, setResult] = useState({ key: null, products: [], total: 0, error: null });
-  // Состояние догрузки следующей страницы (тоже привязано к ключу параметров).
   const [more, setMore] = useState({ key: null, loading: false, error: null });
   const moreControllerRef = useRef(null);
 
@@ -30,11 +22,9 @@ export default function CartForm({ onAdd }) {
   const [quantity, setQuantity] = useState('1');
   const [error, setError] = useState(null);
 
-  // Запрос уходит только через 400 мс после последнего нажатия клавиши.
   const debouncedSearch = useDebounce(search.trim(), SEARCH_DEBOUNCE_MS);
   const requestKey = `${debouncedSearch}|${category}|${reloadKey}`;
 
-  // Первая страница: загружается заново при каждом изменении параметров поиска.
   useEffect(() => {
     const controller = new AbortController();
     fetchProducts({ search: debouncedSearch, category, limit: PAGE_SIZE, offset: 0 }, controller.signal)
@@ -42,15 +32,12 @@ export default function CartForm({ onAdd }) {
       .catch(err => {
         if (!isCanceled(err)) setResult({ key: requestKey, products: [], total: 0, error: getErrorMessage(err) });
       });
-    // Параметры поиска изменились или компонент размонтирован — прерываем устаревшие запросы
-    // (и первой страницы, и догрузки), чтобы их ответы не перезаписали более свежий результат.
     return () => {
       controller.abort();
       moreControllerRef.current?.abort();
     };
   }, [debouncedSearch, category, reloadKey, requestKey]);
 
-  // Загрузка и ожидание debounce вычисляются из состояния, а не хранятся отдельно.
   const isLoading = result.key !== requestKey;
   const isTyping = search.trim() !== debouncedSearch;
   const { products, total, error: loadError } = result;
@@ -58,7 +45,6 @@ export default function CartForm({ onAdd }) {
   const moreError = more.key === requestKey ? more.error : null;
   const hasMore = !isLoading && products.length < total;
 
-  // «Показать ещё»: следующая страница начинается с offset = числу уже загруженных товаров.
   const loadMore = () => {
     const key = requestKey;
     const controller = new AbortController();
@@ -72,7 +58,6 @@ export default function CartForm({ onAdd }) {
       .then(({ items, total: newTotal }) => {
         setResult(prev => {
           if (prev.key !== key) return prev;
-          // Защита от дублей, если каталог изменился между запросами.
           const known = new Set(prev.products.map(p => p.id));
           return { ...prev, products: [...prev.products, ...items.filter(p => !known.has(p.id))], total: newTotal };
         });
@@ -101,7 +86,6 @@ export default function CartForm({ onAdd }) {
       setError(message);
       return;
     }
-    // Оптимистичное добавление: форма сразу готова к следующему товару, ответ сервера не ждём.
     onAdd(selected, size, Number(quantity));
     setQuantity('1');
   };

@@ -27,7 +27,6 @@ const validateBody = body => {
 
 const MAX_LIMIT = 100;
 
-// Параметры пагинации ?limit=&offset= (лаб. №25). Без limit возвращается весь список.
 const parsePagination = ({ limit, offset }) => {
   const page = { offset: 0 };
   if (limit !== undefined) {

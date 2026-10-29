@@ -1,7 +1,5 @@
 'use strict';
 
-// Дополнительные товары каталога (лаб. №25): их достаточно, чтобы каталог в клиенте
-// загружался постранично с кнопкой «Показать ещё».
 const PRODUCTS = [
   { title: 'Футболка Basic белая', category: 'tshirts', sizes: ['XS', 'S', 'M', 'L', 'XL'], color: 'белый', price: 24.9, stock: 40 },
   { title: 'Футболка с принтом City', category: 'tshirts', sizes: ['S', 'M', 'L'], color: 'серый', price: 34.5, stock: 18 },
@@ -19,7 +17,6 @@ const PRODUCTS = [
   { title: 'Кроссовки Runner', category: 'shoes', sizes: ['39', '40', '41', '42', '43', '44'], color: 'серый', price: 159.9, stock: 11 }
 ];
 
-/** @type {import('sequelize-cli').Seed} */
 module.exports = {
   async up(queryInterface) {
     const now = new Date();

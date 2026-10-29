@@ -2,10 +2,6 @@ import { memo, useState } from 'react';
 import { categoryLabel, formatPrice } from '../data/catalog';
 import validateItem, { quantityLimit } from '../utils/validateItem';
 
-/**
- * Строка корзины: изменение количества (−/+), редактирование размера и количества, удаление.
- * Пока по позиции идёт запрос к серверу (isPending), действия заблокированы и показан спиннер.
- */
 function CartItemRow({ item, isEditing, isPending, onStartEdit, onCancelEdit, onUpdate, onRemove }) {
   const [draft, setDraft] = useState(null);
   const [error, setError] = useState(null);
@@ -31,7 +27,6 @@ function CartItemRow({ item, isEditing, isPending, onStartEdit, onCancelEdit, on
       setError(message);
       return;
     }
-    // На сервер уходят только реально изменённые поля.
     const changes = {};
     if (draft.size !== item.size) changes.size = draft.size;
     if (Number(draft.quantity) !== item.quantity) changes.quantity = Number(draft.quantity);
@@ -39,7 +34,6 @@ function CartItemRow({ item, isEditing, isPending, onStartEdit, onCancelEdit, on
     if (Object.keys(changes).length > 0) onUpdate(item.id, changes);
   };
 
-  // Горячие клавиши в режиме редактирования: Enter — сохранить, Escape — отменить.
   const handleKeyDown = e => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -116,5 +110,4 @@ function CartItemRow({ item, isEditing, isPending, onStartEdit, onCancelEdit, on
   );
 }
 
-// React.memo: строка перерисовывается только при изменении её собственных props.
 export default memo(CartItemRow);

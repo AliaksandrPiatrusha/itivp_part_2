@@ -5,7 +5,6 @@ const bcrypt = require('bcrypt');
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@shop.local';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin123!';
 
-/** @type {import('sequelize-cli').Seed} */
 module.exports = {
   async up(queryInterface) {
     const now = new Date();

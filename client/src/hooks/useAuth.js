@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AUTH_EXPIRED_EVENT, TOKEN_KEY, USER_KEY, login as apiLogin, register as apiRegister } from '../api';
 
-// Сессия восстанавливается из localStorage при первом рендере (ленивый инициализатор useState).
 const readSession = () => {
   try {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -17,7 +16,6 @@ const clearStorage = () => {
   localStorage.removeItem(USER_KEY);
 };
 
-/** Вход, регистрация и выход; JWT хранится в localStorage и подставляется в запросы интерцептором axios. */
 export default function useAuth() {
   const [session, setSession] = useState(readSession);
   const [notice, setNotice] = useState(null);
@@ -30,7 +28,6 @@ export default function useAuth() {
     setSession({ token, user });
   }, []);
 
-  // После успешной регистрации сразу выполняем вход теми же данными.
   const register = useCallback(async (email, password) => {
     await apiRegister(email, password);
     await login(email, password);
@@ -41,7 +38,6 @@ export default function useAuth() {
     setSession(null);
   }, []);
 
-  // Сервер вернул 401 на запрос с токеном — сессия истекла, возвращаемся к форме входа.
   useEffect(() => {
     const handleExpired = () => {
       clearStorage();

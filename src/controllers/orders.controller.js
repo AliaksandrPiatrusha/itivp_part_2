@@ -5,7 +5,6 @@ const { parseId, requireFields } = require('../utils/validators');
 
 const isAdmin = req => req.user.role === 'admin';
 
-// Администратор видит все заказы, покупатель — только свои.
 const list = async (req, res) => {
   const { status, customer } = req.query;
   const filter = isAdmin(req) ? { status, customer } : { status, customer, userId: req.user.id };
@@ -15,7 +14,6 @@ const list = async (req, res) => {
 const getOne = async (req, res) => {
   const id = parseId(req.params.id);
   const order = await orders.findById(id);
-  // Чужой заказ отдаём как 404, чтобы не раскрывать факт его существования.
   if (!order || (!isAdmin(req) && order.userId !== req.user.id)) {
     throw ApiError.notFound(`Заказ с id=${id} не найден`);
   }

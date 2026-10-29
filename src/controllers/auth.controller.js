@@ -8,8 +8,6 @@ const SALT_ROUNDS = 10;
 const MIN_PASSWORD_LENGTH = 6;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Сравнение с фиктивным хешем, когда пользователь не найден, выравнивает время ответа
-// и не позволяет по задержке узнать, зарегистрирован ли email.
 const DUMMY_HASH = bcrypt.hashSync('dummy-password', SALT_ROUNDS);
 
 const normalizeEmail = email => String(email).trim().toLowerCase();

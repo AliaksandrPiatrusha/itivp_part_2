@@ -23,7 +23,6 @@ export default function App() {
         )}
       </header>
 
-      {/* key: при смене пользователя корзина монтируется заново и загружается с сервера. */}
       {user
         ? <CartList key={user.id} notify={notify} />
         : <LoginForm onLogin={login} onRegister={register} notice={notice} />}

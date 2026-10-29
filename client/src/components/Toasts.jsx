@@ -5,7 +5,6 @@ const TOAST_TIMEOUT_MS = 4000;
 function Toast({ notification, onDismiss }) {
   const { id, type, text } = notification;
 
-  // Автоскрытие через 4 с; очистка отменяет таймер, если уведомление закрыли вручную.
   useEffect(() => {
     const timer = setTimeout(() => onDismiss(id), TOAST_TIMEOUT_MS);
     return () => clearTimeout(timer);
@@ -19,7 +18,6 @@ function Toast({ notification, onDismiss }) {
   );
 }
 
-/** Всплывающие уведомления о результатах запросов к серверу. */
 export default function Toasts({ notifications, onDismiss }) {
   return (
     <ul className="toasts" aria-live="polite">

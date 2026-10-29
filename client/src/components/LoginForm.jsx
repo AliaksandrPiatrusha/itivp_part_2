@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { getErrorMessage } from '../api';
 
-/** Вход и регистрация. После входа JWT сохраняется в localStorage (см. useAuth). */
 export default function LoginForm({ onLogin, onRegister, notice }) {
-  const [mode, setMode] = useState('login'); // login | register
+  const [mode, setMode] = useState('login');
   const [form, setForm] = useState({ email: '', password: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -24,7 +23,6 @@ export default function LoginForm({ onLogin, onRegister, notice }) {
     try {
       const action = mode === 'login' ? onLogin : onRegister;
       await action(form.email.trim(), form.password);
-      // При успехе компонент размонтируется, сбрасывать состояние не нужно.
     } catch (err) {
       setError(getErrorMessage(err));
       setIsSubmitting(false);

@@ -3,8 +3,6 @@ const products = require('../models/products.model');
 const ApiError = require('../utils/ApiError');
 const { parseId, requireFields, requirePositiveInt } = require('../utils/validators');
 
-// Ответ всегда содержит актуальную корзину; для операций с одной позицией дополнительно
-// возвращается сама позиция (item) — клиент заменяет ею временную/оптимистичную запись.
 const payload = async (userId, itemId) => {
   const items = await cart.getItems(userId);
   const result = { items, total: cart.total(items) };
@@ -42,7 +40,6 @@ const addItem = async (req, res) => {
   res.status(201).json({ data: await payload(req.user.id, saved.id) });
 };
 
-// Изменение количества и/или размера позиции.
 const updateItem = async (req, res) => {
   const id = parseId(req.params.itemId);
   if (!req.body || typeof req.body !== 'object') {

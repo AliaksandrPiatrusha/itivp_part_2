@@ -1,5 +1,4 @@
 'use strict';
-/** @type {import('sequelize-cli').Seed} */
 module.exports = {
   async up(queryInterface) {
     const now = new Date();

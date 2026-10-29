@@ -1,8 +1,6 @@
 const { UniqueConstraintError } = require('sequelize');
 const { sequelize, CartItem, Product } = require('../db/models');
 
-// Сведения о товаре (категория, цвет, доступные размеры, остаток) нужны клиенту
-// для отображения, фильтрации и редактирования позиции.
 const toDTO = item => ({
   id: item.id,
   productId: item.productId,
@@ -55,7 +53,6 @@ const addItem = async ({ userId, productId, title, size, price, quantity }) => {
 const findItemWithProduct = (userId, id) =>
   CartItem.findOne({ where: { id, userId }, include: [{ model: Product, as: 'product' }] });
 
-// changes: { quantity?, size? }
 const updateItem = async (userId, id, changes) => {
   const item = await findItem(userId, id);
   if (!item) return null;
