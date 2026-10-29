@@ -93,19 +93,7 @@ export default function CartForm({ onAdd, inCart = {} }) {
       setError('Выберите товар из каталога');
       return;
     }
-    const already = inCartOf(selected);
-    const available = availableOf(selected);
-    if (selected.stock < 1) {
-      setError('Товара нет на складе');
-      return;
-    }
-    if (Number(quantity) > available) {
-      setError(available === 0
-        ? `В корзине уже ${already} из ${selected.stock} доступных`
-        : `В корзине уже ${already} из ${selected.stock} доступных, можно добавить ещё ${available}`);
-      return;
-    }
-    const message = validateItem({ size, sizes: selected.sizes, quantity, stock: available });
+    const message = validateItem({ size, sizes: selected.sizes, quantity, stock: null });
     if (message) {
       setError(message);
       return;
@@ -114,9 +102,8 @@ export default function CartForm({ onAdd, inCart = {} }) {
     setQuantity('1');
   };
 
-  const available = selected ? availableOf(selected) : 0;
-  const max = selected ? quantityLimit(available) : 1;
-  const canAdd = Boolean(selected) && available > 0;
+  const max = quantityLimit(null);
+  const canAdd = Boolean(selected);
 
   return (
     <div className="card cart-form">
@@ -158,7 +145,6 @@ export default function CartForm({ onAdd, inCart = {} }) {
                 type="button"
                 className={`product ${selected?.id === p.id ? 'selected' : ''}`}
                 onClick={() => selectProduct(p)}
-                disabled={p.stock < 1}
                 aria-pressed={selected?.id === p.id}
               >
                 <span className="badge">{categoryLabel(p.category)}</span>

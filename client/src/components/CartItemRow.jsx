@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
 import { categoryLabel, formatPrice } from '../data/catalog';
+import { MAX_QUANTITY } from '../data/catalog';
 import validateItem from '../utils/validateItem';
 
 function CartItemRow({ item, isEditing, isPending, maxQuantity, onStartEdit, onCancelEdit, onUpdate, onRemove }) {
@@ -23,7 +24,7 @@ function CartItemRow({ item, isEditing, isPending, maxQuantity, onStartEdit, onC
   };
 
   const save = () => {
-    const message = validateItem({ ...draft, sizes: item.sizes, stock: max });
+    const message = validateItem({ ...draft, sizes: item.sizes, stock: null });
     if (message) {
       setError(message);
       return;
@@ -62,7 +63,7 @@ function CartItemRow({ item, isEditing, isPending, maxQuantity, onStartEdit, onC
           </label>
           <label className="field">
             <span>Кол-во</span>
-            <input name="quantity" type="number" min="1" max={max} value={draft.quantity} onChange={handleChange} />
+            <input name="quantity" type="number" min="1" max={MAX_QUANTITY} value={draft.quantity} onChange={handleChange} />
           </label>
         </div>
         {error && <p className="error" role="alert">{error}</p>}
@@ -105,7 +106,7 @@ function CartItemRow({ item, isEditing, isPending, maxQuantity, onStartEdit, onC
           type="button"
           className="btn btn-icon"
           onClick={() => onUpdate(item.id, { quantity: item.quantity + 1 })}
-          disabled={locked || item.quantity >= max}
+          disabled={locked || item.quantity >= MAX_QUANTITY}
           aria-label="Увеличить"
         >+</button>
       </div>
