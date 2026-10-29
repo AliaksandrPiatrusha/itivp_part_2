@@ -10,10 +10,10 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
+      <header className={`app-header ${user ? '' : 'app-header-centered'}`}>
         <div>
           <h1>Магазин одежды</h1>
-          <p className="muted">Управление корзиной · данные хранятся на сервере (REST API)</p>
+          {user && <p className="muted">Управление корзиной · данные хранятся на сервере (REST API)</p>}
         </div>
         {user && (
           <div className="user-box">
