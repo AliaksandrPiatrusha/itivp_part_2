@@ -24,4 +24,15 @@ const requirePositiveInt = (value, field) => {
   }
 };
 
-module.exports = { parseId, requireFields, requirePositiveInt };
+const parseObjectId = value => {
+  if (typeof value !== 'string' || !/^[a-f0-9]{24}$/i.test(value)) {
+    throw ApiError.badRequest(`Некорректный ObjectId: ${value}`);
+  }
+  return value;
+};
+
+const queryString = value => (typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined);
+
+const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+module.exports = { parseId, requireFields, requirePositiveInt, parseObjectId, queryString, escapeRegex };

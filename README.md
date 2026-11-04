@@ -20,11 +20,16 @@
 (пакет `cors`), параметры `search`, `limit`, `offset` у `GET /api/products`, смена размера
 в `PUT /api/cart/items/:itemId` и сид с дополнительными товарами. Подробнее — [`client/README.md`](client/README.md).
 
+В лаб. №26 добавлена параллельная реализация каталога, корзины и заказов на MongoDB (ODM Mongoose)
+под префиксом `/api/mongo`. Реляционный API на PostgreSQL продолжает работать без изменений.
+Подробнее — раздел [MongoDB (лаб. №26)](#mongodb-лаб-26).
+
 ## Стек
 
 - Node.js
 - Express 4, cors
 - PostgreSQL + Sequelize 6 (ORM), sequelize-cli (миграции и сиды)
+- MongoDB (Atlas или локально) + Mongoose (ODM) — лаб. №26
 - jsonwebtoken (JWT), bcrypt (хеширование паролей)
 - nodemon (dev)
 - Клиент: React 19 + Vite, axios
@@ -34,7 +39,7 @@
 ```bash
 git clone https://github.com/AliaksandrPiatrusha/itivp_part_2.git
 cd itivp_part_2
-git checkout lab25
+git checkout lab26
 npm install
 ```
 
@@ -93,6 +98,7 @@ npm run dev
 | `npm run db:migrate:undo` | Откатить последнюю миграцию |
 | `npm run db:seed` | Заполнить БД тестовыми данными |
 | `npm run db:seed:undo` | Удалить тестовые данные |
+| `npm run mongo:seed` | Заполнить MongoDB тестовыми товарами (лаб. №26) |
 
 ## Структура проекта
 
@@ -299,6 +305,100 @@ curl -i -X PATCH http://localhost:3000/api/orders/1/status \
 расширение REST Client в VS Code и используйте ссылку `Send Request` над каждым блоком.
 
 Альтернативно — Postman, Insomnia или curl.
+
+## MongoDB (лаб. №26)
+
+### Подключение
+
+1. Создайте бесплатный кластер M0 в MongoDB Atlas, пользователя БД и разрешите доступ со своего IP
+   (Network Access). Либо установите MongoDB Community Edition локально.
+2. Добавьте строку подключения в `.env`:
+
+   ```
+   MONGO_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/clothing_store?retryWrites=true&w=majority
+   # или локально: MONGO_URI=mongodb://127.0.0.1:27017/clothing_store
+   ```
+
+3. Заполните коллекции тестовыми товарами (коллекции `products`, `carts`, `orders` очищаются):
+
+   ```bash
+   npm run mongo:seed
+   ```
+
+4. Запустите сервер `npm run dev` — в консоли появится `MongoDB connected`. Подключение выполняется
+   в `server.js` через `src/mongo/connection.js`. Если `MONGO_URI` не задана или кластер недоступен,
+   PostgreSQL-часть работает, а маршруты `/api/mongo/*` отвечают `503`.
+
+Аутентификация общая: JWT выдаётся `POST /api/auth/login` (пользователи хранятся в PostgreSQL),
+поле `userId` в документах MongoDB — это `id` пользователя из токена.
+
+### Документная модель
+
+```
+src/mongo/
+├── connection.js            mongoose.connect, middleware requireMongo (503 без подключения)
+├── models/
+│   ├── Product.js           товар + массив tags + вложенные отзывы reviews[]
+│   ├── Cart.js              одна корзина на пользователя, позиции items[] внутри документа
+│   └── Order.js             заказ + вложенный customer + items[] + statusHistory[]
+├── controllers/             CRUD на методах Mongoose
+└── routes.js                маршруты /api/mongo/*
+```
+
+Пример документа заказа (вместо строк в двух таблицах `Orders` и `OrderItems` — один документ):
+
+```json
+{
+  "_id": "6729f0c2a1b2c3d4e5f60789",
+  "userId": 2,
+  "customer": { "name": "Иван Петров", "email": "ivan@example.com", "phone": "", "address": "г. Минск" },
+  "items": [
+    { "_id": "6729f0c2a1b2c3d4e5f6078a", "product": "6729ef01a1b2c3d4e5f60001", "title": "Футболка Oversize", "size": "M", "price": 39.9, "quantity": 2 }
+  ],
+  "total": 79.8,
+  "status": "paid",
+  "statusHistory": [
+    { "status": "new", "changedAt": "2026-11-04T10:00:00.000Z" },
+    { "status": "paid", "changedAt": "2026-11-04T10:05:00.000Z" }
+  ]
+}
+```
+
+| PostgreSQL (Sequelize) | MongoDB (Mongoose) |
+|---|---|
+| Таблицы `CartItems` с внешними ключами `userId`, `productId` | Коллекция `carts`: один документ на пользователя с массивом `items` |
+| `Orders` + `OrderItems`, `JOIN` через `include` | Один документ `orders` с вложенными `customer` и `items` |
+| Отзывы потребовали бы таблицу `Reviews` | Массив поддокументов `reviews` в товаре |
+| Колонка `sizes` типа JSON | Нативный массив `sizes: [String]`, поиск `{ sizes: "M" }` |
+| Транзакции `sequelize.transaction` с блокировкой строк | Атомарные операции над одним документом (`$inc`, `$push`, `$pull`, позиционный `$`) |
+
+### Эндпоинты `/api/mongo`
+
+| Метод | Маршрут | Назначение (метод Mongoose) | Доступ |
+|---|---|---|---|
+| GET | `/api/mongo/products` | Каталог, `?category=&size=&tag=&maxPrice=&search=&limit=&offset=` (`find().sort().skip().limit()`) | — |
+| GET | `/api/mongo/products/:id` | Товар по ObjectId (`findById`) | — |
+| POST | `/api/mongo/products` | Создать товар (`create`) | admin |
+| PUT | `/api/mongo/products/:id` | Обновить товар (`findByIdAndUpdate`, `runValidators`) | admin |
+| DELETE | `/api/mongo/products/:id` | Удалить товар (`findByIdAndDelete`) и убрать его из всех корзин (`updateMany` + `$pull`); возвращает удалённый документ | admin |
+| POST | `/api/mongo/products/:id/reviews` | Добавить отзыв `{ rating, comment }` (`$push` во вложенный массив) | auth |
+| DELETE | `/api/mongo/products/:id/reviews/:reviewId` | Удалить свой отзыв (admin — любой) (`$pull`) | auth |
+| GET | `/api/mongo/cart` | Корзина с `populate('items.product')` и суммой `total` (virtual) | auth |
+| POST | `/api/mongo/cart/items` | Добавить `{ productId, size, quantity }`: если позиция уже есть — `$inc` по `items.$.quantity`, иначе `$push` (upsert корзины) | auth |
+| PATCH | `/api/mongo/cart/items/:itemId` | Изменить `{ quantity }` через позиционный оператор `$set: { "items.$.quantity" }` | auth |
+| DELETE | `/api/mongo/cart/items/:itemId` | Удалить позицию (`$pull`) | auth |
+| DELETE | `/api/mongo/cart` | Очистить корзину | auth |
+| GET | `/api/mongo/orders` | Заказы, `?status=&customer=` (поиск по вложенному полю `customer.name`); `user` — только свои | auth |
+| GET | `/api/mongo/orders/stats` | Агрегация: заказы и выручка по статусам, топ-5 товаров (`$match`, `$unwind`, `$group`, `$sort`, `$limit`) | admin |
+| GET | `/api/mongo/orders/:id` | Заказ с `populate('items.product')` | auth |
+| POST | `/api/mongo/orders` | Оформить заказ из корзины `{ customer: { name, address, phone? } }`, атомарно списать остаток (`$inc` с условием `stock >= quantity`) | auth |
+| PUT | `/api/mongo/orders/:id` | Полное обновление `{ customer, items, status }` (`findByIdAndUpdate`) | admin |
+| PATCH | `/api/mongo/orders/:id/status` | Смена статуса + запись в `statusHistory` (`$set` + `$push`) | admin |
+| DELETE | `/api/mongo/orders/:id` | Удалить заказ (`findByIdAndDelete`), в ответе — удалённый документ | admin |
+
+Ошибки Mongoose обрабатываются в `src/middleware/errorHandler.js`: `ValidationError` и `CastError` → 400,
+дубликат ключа (`E11000`) → 409. Некорректный ObjectId в URL → 400. Готовые запросы — в разделе
+«MongoDB (лаб. №26)» файла `requests.http`.
 
 ## Дальнейшее развитие
 

@@ -3,11 +3,38 @@ const {
   UniqueConstraintError,
   ForeignKeyConstraintError
 } = require('sequelize');
+const mongoose = require('mongoose');
 
 const errorHandler = (err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     return res.status(400).json({
       error: { status: 400, message: 'Некорректный JSON в теле запроса' }
+    });
+  }
+
+  if (err instanceof mongoose.Error.ValidationError) {
+    return res.status(400).json({
+      error: {
+        status: 400,
+        message: 'Ошибка валидации данных',
+        details: Object.values(err.errors).map(e => e.message)
+      }
+    });
+  }
+
+  if (err instanceof mongoose.Error.CastError) {
+    return res.status(400).json({
+      error: { status: 400, message: `Некорректное значение поля ${err.path}: ${err.value}` }
+    });
+  }
+
+  if (err && err.code === 11000) {
+    return res.status(409).json({
+      error: {
+        status: 409,
+        message: 'Документ с такими данными уже существует',
+        details: Object.keys(err.keyValue || {})
+      }
     });
   }
 

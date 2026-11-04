@@ -10,7 +10,8 @@
     "db:migrate:undo": "sequelize-cli db:migrate:undo",
     "db:seed": "sequelize-cli db:seed:all",
     "db:seed:undo": "sequelize-cli db:seed:undo:all",
-    "db:view": "node scripts/db-view.js"
+    "db:view": "node scripts/db-view.js",
+    "mongo:seed": "node scripts/mongo-seed.js"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +23,7 @@
     "dotenv": "^17.4.2",
     "express": "^4.22.2",
     "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.11.4",
     "pg": "^8.23.0",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.8"

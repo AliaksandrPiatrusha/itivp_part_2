@@ -7,8 +7,17 @@ if (!process.env.JWT_SECRET) {
 
 const app = require('./src/app');
 const { sequelize } = require('./src/db/models');
+const { connectMongo } = require('./src/mongo/connection');
 
 const PORT = process.env.PORT || 3000;
+
+if (process.env.MONGO_URI) {
+  connectMongo(process.env.MONGO_URI)
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.error('MongoDB connection error:', err.message));
+} else {
+  console.warn('MONGO_URI не задана: маршруты /api/mongo/* будут возвращать 503');
+}
 
 sequelize.authenticate()
   .then(() => {

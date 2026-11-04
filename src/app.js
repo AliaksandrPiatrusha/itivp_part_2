@@ -23,7 +23,8 @@ app.use('/api', routes);
 app.get('/', (req, res) => {
   res.json({
     name: 'Clothing Store API',
-    endpoints: ['/api/auth', '/api/profile', '/api/users', '/api/products', '/api/cart', '/api/orders']
+    endpoints: ['/api/auth', '/api/profile', '/api/users', '/api/products', '/api/cart', '/api/orders'],
+    mongoEndpoints: ['/api/mongo/products', '/api/mongo/cart', '/api/mongo/orders']
   });
 });
 

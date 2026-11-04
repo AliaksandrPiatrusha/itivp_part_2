@@ -264,3 +264,155 @@ GET {{host}}/unknown
 
 ###
 GET http://localhost:3000/
+
+
+# ===== MongoDB (лаб. №26): /api/mongo =====
+# Перед запуском: MONGO_URI в .env и npm run mongo:seed. Токены берутся из запросов входа выше.
+
+### Каталог MongoDB с пагинацией
+# @name mongoProducts
+GET {{host}}/mongo/products?limit=3&offset=0
+
+@mongoProductId = {{mongoProducts.response.body.data.0._id}}
+
+### Поиск по массиву tags (tags содержит "деним")
+GET {{host}}/mongo/products?tag=деним
+
+### Поиск по массиву sizes + фильтр по цене
+GET {{host}}/mongo/products?size=XL&maxPrice=100
+
+### Товар по ObjectId (вложенные reviews, виртуальные поля rating и finalPrice)
+GET {{host}}/mongo/products/{{mongoProductId}}
+
+### Некорректный ObjectId -> 400
+GET {{host}}/mongo/products/123
+
+### Создать товар (admin)
+# @name mongoCreatedProduct
+POST {{host}}/mongo/products
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "title": "Шорты карго", "category": "shorts", "sizes": ["S", "M", "L"], "color": "бежевый", "price": 45, "stock": 5, "tags": ["лето", "хлопок"] }
+
+@mongoNewProductId = {{mongoCreatedProduct.response.body.data._id}}
+
+### Ошибка валидации схемы (пустые sizes, отрицательная цена) -> 400
+POST {{host}}/mongo/products
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "title": "Bad", "category": "shorts", "sizes": [], "price": -1 }
+
+### Обновить товар (findByIdAndUpdate)
+PUT {{host}}/mongo/products/{{mongoNewProductId}}
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "title": "Шорты карго Relaxed", "category": "shorts", "sizes": ["M", "L"], "price": 49.9, "stock": 7, "discountPercent": 15 }
+
+### Добавить отзыв во вложенный массив reviews ($push)
+# @name mongoReview
+POST {{host}}/mongo/products/{{mongoProductId}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{ "rating": 4, "comment": "Хорошо сидит, ткань плотная" }
+
+### Удалить свой отзыв ($pull)
+DELETE {{host}}/mongo/products/{{mongoProductId}}/reviews/{{mongoReview.response.body.data.review._id}}
+Authorization: Bearer {{userToken}}
+
+### Добавить в корзину (новая позиция -> $push, upsert корзины)
+POST {{host}}/mongo/cart/items
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{ "productId": "{{mongoProductId}}", "size": "M", "quantity": 1 }
+
+### Повторно тот же товар и размер -> $inc по items.$.quantity
+# @name mongoCartAdd
+POST {{host}}/mongo/cart/items
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{ "productId": "{{mongoProductId}}", "size": "M", "quantity": 2 }
+
+@mongoCartItemId = {{mongoCartAdd.response.body.data.items.0._id}}
+
+### Корзина (populate items.product, virtual total)
+GET {{host}}/mongo/cart
+Authorization: Bearer {{userToken}}
+
+### Изменить количество позиции (позиционный оператор $set items.$.quantity)
+PATCH {{host}}/mongo/cart/items/{{mongoCartItemId}}
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{ "quantity": 2 }
+
+### Превышение остатка -> 409
+PATCH {{host}}/mongo/cart/items/{{mongoCartItemId}}
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{ "quantity": 999 }
+
+### Оформить заказ из корзины
+# @name mongoOrder
+POST {{host}}/mongo/orders
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{ "customer": { "name": "Иван Петров", "phone": "+375291234567", "address": "г. Минск, ул. Независимости, 25" } }
+
+@mongoOrderId = {{mongoOrder.response.body.data._id}}
+
+### Мои заказы, поиск по вложенному полю customer.name
+GET {{host}}/mongo/orders?customer=иван
+Authorization: Bearer {{userToken}}
+
+### Заказ по id
+GET {{host}}/mongo/orders/{{mongoOrderId}}
+Authorization: Bearer {{userToken}}
+
+### Смена статуса + $push в statusHistory (admin)
+PATCH {{host}}/mongo/orders/{{mongoOrderId}}/status
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "status": "paid" }
+
+### Покупатель меняет статус -> 403
+PATCH {{host}}/mongo/orders/{{mongoOrderId}}/status
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{ "status": "delivered" }
+
+### Полное обновление заказа (admin)
+PUT {{host}}/mongo/orders/{{mongoOrderId}}
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "customer": { "name": "Иван Петров", "email": "ivan@example.com", "address": "г. Минск, пр. Победителей, 1" },
+  "status": "shipped",
+  "items": [{ "productId": "{{mongoProductId}}", "title": "Футболка Oversize", "size": "L", "price": 39.9, "quantity": 2 }]
+}
+
+### Статистика заказов (aggregation pipeline, admin)
+GET {{host}}/mongo/orders/stats
+Authorization: Bearer {{adminToken}}
+
+### Удалить заказ — в ответе удалённый документ (admin)
+DELETE {{host}}/mongo/orders/{{mongoOrderId}}
+Authorization: Bearer {{adminToken}}
+
+### Удалить товар — позиции с ним удаляются из всех корзин (admin)
+DELETE {{host}}/mongo/products/{{mongoNewProductId}}
+Authorization: Bearer {{adminToken}}
+
+### Очистить корзину
+DELETE {{host}}/mongo/cart
+Authorization: Bearer {{userToken}}

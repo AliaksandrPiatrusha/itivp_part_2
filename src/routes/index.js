@@ -4,6 +4,7 @@ const usersRoutes = require('./users.routes');
 const productsRoutes = require('./products.routes');
 const cartRoutes = require('./cart.routes');
 const ordersRoutes = require('./orders.routes');
+const mongoRoutes = require('../mongo/routes');
 const auth = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const authController = require('../controllers/auth.controller');
@@ -16,5 +17,6 @@ router.use('/users', usersRoutes);
 router.use('/products', productsRoutes);
 router.use('/cart', cartRoutes);
 router.use('/orders', ordersRoutes);
+router.use('/mongo', mongoRoutes);
 
 module.exports = router;
